@@ -164,27 +164,12 @@ export function localServerPlugin(): Plugin {
 
                     const rtmpUrl = `rtmp://a.rtmp.youtube.com/live2/${ytKey}`;
 
-                    // Improved FFmpeg command: transcode to H.264/AAC for YouTube compatibility
-                    // Using fastpreset for low latency and consistent results
+                    // ffmpeg [-stream_loop -1] -re -i video.mp4 -c copy -f flv rtmp://...
                     const ffmpegArgs = [];
                     if (loop) {
                         ffmpegArgs.push('-stream_loop', '-1');
                     }
-                    ffmpegArgs.push(
-                        '-re',
-                        '-i', videoPath,
-                        '-vcodec', 'libx264',
-                        '-preset', 'veryfast',
-                        '-maxrate', '3000k',
-                        '-bufsize', '6000k',
-                        '-pix_fmt', 'yuv420p',
-                        '-g', '60', // Keyframe interval (2 seconds at 30fps)
-                        '-acodec', 'aac',
-                        '-ar', '44100',
-                        '-b:a', '128k',
-                        '-f', 'flv',
-                        rtmpUrl
-                    );
+                    ffmpegArgs.push('-re', '-i', videoPath, '-c', 'copy', '-f', 'flv', rtmpUrl);
 
                     currentStreamProcess = spawn('ffmpeg', ffmpegArgs);
 
@@ -201,15 +186,11 @@ export function localServerPlugin(): Plugin {
                     });
 
                     currentStreamProcess.stderr?.on('data', (data) => {
-                        const log = data.toString();
-                        console.error(`FFmpeg stderr: ${log}`);
-                        appendLog(log);
+                        appendLog(data.toString());
                     });
 
                     currentStreamProcess.stdout?.on('data', (data) => {
-                        const log = data.toString();
-                        console.log(`FFmpeg stdout: ${log}`);
-                        appendLog(log);
+                        appendLog(data.toString());
                     });
 
                     res.setHeader('Content-Type', 'application/json');
