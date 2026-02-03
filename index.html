@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudStream R2 Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        // Minimal polyfills to satisfy AWS SDK without triggering "unenv" filesystem lookups
+        window.global = window;
+        window.process = {
+            env: { NODE_DEBUG: undefined },
+            version: '',
+            versions: {},
+            nextTick: (cb) => setTimeout(cb, 0),
+            platform: 'browser',
+            browser: true,
+            cwd: () => '/',
+        };
+    </script>
+    <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@19.0.0/",
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom/": "https://esm.sh/react-dom@19.0.0/",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "@aws-sdk/client-s3": "https://esm.sh/@aws-sdk/client-s3@3.540.0?bundle",
+    "@aws-sdk/lib-storage": "https://esm.sh/@aws-sdk/lib-storage@3.540.0?bundle&deps=@aws-sdk/client-s3@3.540.0",
+    "fs": "https://esm.sh/browserify-fs@1.0.0",
+    "os": "https://esm.sh/os-browserify@0.3.0",
+    "path": "https://esm.sh/path-browserify@1.0.1"
+  }
+}
+</script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .custom-scrollbar {
+            scrollbar-width: thin;
+            scrollbar-color: #334155 #1e293b;
+        }
+    </style>
+    <link rel="stylesheet" href="/index.css">
+</head>
+
+<body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+</body>
+
+</html>

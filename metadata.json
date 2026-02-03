@@ -1,0 +1,7 @@
+{
+  "name": "CloudStream R2 Manager",
+  "description": "A premium, enterprise-grade interface for managing Cloudflare R2 storage with support for folder structures, bulk uploads, and file operations.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
