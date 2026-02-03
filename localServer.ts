@@ -1,17 +1,33 @@
-
-import { Plugin } from 'vite';
+import { Plugin, loadEnv } from 'vite';
 import fs from 'fs';
 import path from 'path';
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { fileURLToPath } from 'url';
+import { spawn, ChildProcess } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+let currentStreamProcess: ChildProcess | null = null;
+let currentStreamingVideo: string | null = null;
+const MAX_LOG_LINES = 1000;
+let streamLogs: string[] = [];
+
+const appendLog = (data: string) => {
+    const lines = data.split('\n');
+    streamLogs.push(...lines.filter(l => l.trim()));
+    if (streamLogs.length > MAX_LOG_LINES) {
+        streamLogs = streamLogs.slice(streamLogs.length - MAX_LOG_LINES);
+    }
+};
 
 export function localServerPlugin(): Plugin {
     return {
         name: 'local-server-plugin',
         configureServer(server) {
+            const env = loadEnv(server.config.mode, '.', '');
+            const ytKey = env['YT-KEY'];
+
             server.middlewares.use(async (req, res, next) => {
                 if (!req.url) return next();
 
@@ -113,6 +129,117 @@ export function localServerPlugin(): Plugin {
                             res.end(JSON.stringify({ error: error.message }));
                         }
                     });
+                    return;
+                }
+
+                // API to start streaming
+                if (req.url === '/api/local/stream/start' && req.method === 'POST') {
+                    let body = '';
+                    req.on('data', chunk => {
+                        body += chunk.toString();
+                    });
+
+                    req.on('end', async () => {
+                        try {
+                            const { fileName, loop } = JSON.parse(body);
+                            if (!fileName) {
+                                res.statusCode = 400;
+                                res.end(JSON.stringify({ error: 'fileName is required' }));
+                                return;
+                            }
+
+                            if (currentStreamProcess) {
+                                res.statusCode = 400;
+                                res.end(JSON.stringify({ error: 'A stream is already running' }));
+                                return;
+                            }
+
+                            if (!ytKey) {
+                                res.statusCode = 500;
+                                res.end(JSON.stringify({ error: 'YouTube Stream Key (YT-KEY) not found in .env.local' }));
+                                return;
+                            }
+
+                            const videoPath = path.resolve(__dirname, 'public', fileName);
+                            if (!fs.existsSync(videoPath)) {
+                                res.statusCode = 404;
+                                res.end(JSON.stringify({ error: 'Video file not found' }));
+                                return;
+                            }
+
+                            const rtmpUrl = `rtmp://a.rtmp.youtube.com/live2/${ytKey}`;
+
+                            // ffmpeg [-stream_loop -1] -re -i video.mp4 -c copy -f flv rtmp://...
+                            const ffmpegArgs = [];
+                            if (loop) {
+                                ffmpegArgs.push('-stream_loop', '-1');
+                            }
+                            ffmpegArgs.push('-re', '-i', videoPath, '-c', 'copy', '-f', 'flv', rtmpUrl);
+
+                            currentStreamProcess = spawn('ffmpeg', ffmpegArgs);
+
+                            streamLogs = []; // Clear logs for new stream
+                            appendLog(`Starting stream for ${fileName} with loop=${loop}`);
+
+                            currentStreamingVideo = fileName;
+
+                            currentStreamProcess.on('exit', (code) => {
+                                console.log(`FFmpeg exited with code ${code}`);
+                                appendLog(`FFmpeg exited with code ${code}`);
+                                currentStreamProcess = null;
+                                currentStreamingVideo = null;
+                            });
+
+                            currentStreamProcess.stderr?.on('data', (data) => {
+                                appendLog(data.toString());
+                            });
+
+                            currentStreamProcess.stdout?.on('data', (data) => {
+                                appendLog(data.toString());
+                            });
+
+                            res.setHeader('Content-Type', 'application/json');
+                            res.end(JSON.stringify({ message: 'Stream started', fileName }));
+
+                        } catch (error: any) {
+                            res.statusCode = 500;
+                            res.end(JSON.stringify({ error: error.message }));
+                        }
+                    });
+                    return;
+                }
+
+                // API to stop streaming
+                if (req.url === '/api/local/stream/stop' && req.method === 'POST') {
+                    if (currentStreamProcess) {
+                        currentStreamProcess.kill();
+                        currentStreamProcess = null;
+                        currentStreamingVideo = null;
+                        res.setHeader('Content-Type', 'application/json');
+                        res.end(JSON.stringify({ message: 'Stream stopped' }));
+                    } else {
+                        res.statusCode = 400;
+                        res.end(JSON.stringify({ error: 'No stream is currently running' }));
+                    }
+                    return;
+                }
+
+                // API to get stream status
+                if (req.url === '/api/local/stream/status' && req.method === 'GET') {
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({
+                        isStreaming: !!currentStreamProcess,
+                        fileName: currentStreamingVideo
+                    }));
+                    return;
+                }
+
+                // API to get stream logs
+                if (req.url === '/api/local/stream/logs' && req.method === 'GET') {
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({
+                        logs: streamLogs
+                    }));
                     return;
                 }
 

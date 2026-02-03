@@ -17,6 +17,7 @@ export default defineConfig(({ mode }) => {
       'process.env.R2_SECRET_ACCESS_KEY': JSON.stringify(env.R2_SECRET_ACCESS_KEY),
       'process.env.R2_ENDPOINT': JSON.stringify(env.R2_ENDPOINT),
       'process.env.R2_BUCKET_NAME': JSON.stringify(env.R2_BUCKET_NAME),
+      'process.env.YT-KEY': JSON.stringify(env.YT_KEY),
     },
     resolve: {
       alias: {
