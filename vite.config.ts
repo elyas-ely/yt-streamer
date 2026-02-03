@@ -30,6 +30,7 @@ export default defineConfig(({ mode }) => {
     preview: {
       port: 3000,
       host: '0.0.0.0',
+      allowedHosts: ['lo0k08sw4g0sg0s80c4cosos.185.253.7.89.sslip.io'],
     }
   };
 });

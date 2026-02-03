@@ -97,6 +97,7 @@ export function localServerPlugin(): Plugin {
                         fs.mkdirSync(publicDir, { recursive: true });
                     }
 
+                    const fileName = path.basename(key);
                     const filePath = path.join(publicDir, fileName);
                     const writeStream = fs.createWriteStream(filePath);
 
