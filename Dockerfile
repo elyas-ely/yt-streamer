@@ -18,7 +18,7 @@ COPY . .
 RUN npm run build
 
 # Expose the Vite preview port
-EXPOSE 80
+EXPOSE 3000
 
-# Start the preview server on all interfaces
-CMD ["npm", "run", "preview"]
+# Start the preview server on all interfaces binding to 0.0.0.0 and port 3000
+CMD ["npx", "vite", "preview", "--host", "0.0.0.0", "--port", "3000"]

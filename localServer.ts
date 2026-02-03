@@ -22,7 +22,8 @@ const appendLog = (data: string) => {
 };
 
 export function localServerPlugin(): Plugin {
-    const handleRequest = (server: any, req: any, res: any, next: any) => {
+    const handleRequest = (server: any, req: any, res: any, next: any, isPreview = false) => {
+        const publicDir = path.resolve(__dirname, isPreview ? 'dist' : 'public');
         const env = loadEnv(server.config.mode, '.', '');
         const ytKey = env['YT_KEY'];
 
@@ -31,7 +32,6 @@ export function localServerPlugin(): Plugin {
         // API to list videos in /public
         if (req.url === '/api/local/videos' && req.method === 'GET') {
             try {
-                const publicDir = path.resolve(__dirname, 'public');
                 if (!fs.existsSync(publicDir)) {
                     fs.mkdirSync(publicDir, { recursive: true });
                 }
@@ -93,9 +93,6 @@ export function localServerPlugin(): Plugin {
                     });
 
                     const response = await s3Client.send(command);
-                    const fileName = key.split('/').pop() || 'downloaded_video.mp4';
-                    const publicDir = path.resolve(__dirname, 'public');
-
                     if (!fs.existsSync(publicDir)) {
                         fs.mkdirSync(publicDir, { recursive: true });
                     }
@@ -157,7 +154,7 @@ export function localServerPlugin(): Plugin {
                         return;
                     }
 
-                    const videoPath = path.resolve(__dirname, 'public', fileName);
+                    const videoPath = path.resolve(publicDir, fileName);
                     if (!fs.existsSync(videoPath)) {
                         res.statusCode = 404;
                         res.end(JSON.stringify({ error: 'Video file not found' }));
@@ -246,10 +243,10 @@ export function localServerPlugin(): Plugin {
     return {
         name: 'local-server-plugin',
         configureServer(server) {
-            server.middlewares.use((req, res, next) => handleRequest(server, req, res, next));
+            server.middlewares.use((req, res, next) => handleRequest(server, req, res, next, false));
         },
         configurePreviewServer(server) {
-            server.middlewares.use((req, res, next) => handleRequest(server, req, res, next));
+            server.middlewares.use((req, res, next) => handleRequest(server, req, res, next, true));
         }
     };
 }
