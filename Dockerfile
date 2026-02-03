@@ -21,4 +21,4 @@ RUN npm run build
 EXPOSE 80
 
 # Start the preview server on all interfaces
-CMD ["serve", "-s", "dist", "-l", "80"]
+CMD ["npm", "run", "preview"]
