@@ -26,7 +26,7 @@ export function localServerPlugin(): Plugin {
         name: 'local-server-plugin',
         configureServer(server) {
             const env = loadEnv(server.config.mode, '.', '');
-            const ytKey = env['YT-KEY'];
+            const ytKey = env['YT_KEY'];
 
             server.middlewares.use(async (req, res, next) => {
                 if (!req.url) return next();
