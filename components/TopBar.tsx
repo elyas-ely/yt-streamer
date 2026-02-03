@@ -13,7 +13,8 @@ import {
   IconTrash,
   IconFolder,
   IconClose,
-  IconDownload
+  IconDownload,
+  IconGridSmall
 } from './Icons';
 
 interface TopBarProps {
@@ -118,8 +119,8 @@ export const TopBar: React.FC<TopBarProps> = ({
               disabled={!currentPath}
               onClick={handleGoBack}
               className={`p-2 rounded-xl border border-slate-700 transition-all shadow-sm shrink-0 ${!currentPath
-                  ? 'opacity-30 cursor-not-allowed bg-slate-800/50'
-                  : 'bg-slate-800 hover:bg-slate-700 text-slate-200 active:scale-90'
+                ? 'opacity-30 cursor-not-allowed bg-slate-800/50'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-200 active:scale-90'
                 }`}
               title="Go Back"
             >
@@ -241,15 +242,25 @@ export const TopBar: React.FC<TopBarProps> = ({
             <button
               onClick={() => setViewMode('grid')}
               className={`p-1.5 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-indigo-600 text-white shadow-[0_4px_12px_rgba(79,70,229,0.4)]' : 'text-slate-500 hover:text-slate-300'}`}
+              title="Grid View"
             >
               <IconGrid className="w-4 h-4" />
             </button>
             <button
+              onClick={() => setViewMode('grid-small')}
+              className={`p-1.5 rounded-xl transition-all ${viewMode === 'grid-small' ? 'bg-indigo-600 text-white shadow-[0_4px_12px_rgba(79,70,229,0.4)]' : 'text-slate-500 hover:text-slate-300'}`}
+              title="Compact Grid"
+            >
+              <IconGridSmall className="w-4 h-4" />
+            </button>
+            <button
               onClick={() => setViewMode('list')}
               className={`p-1.5 rounded-xl transition-all ${viewMode === 'list' ? 'bg-indigo-600 text-white shadow-[0_4px_12px_rgba(79,70,229,0.4)]' : 'text-slate-500 hover:text-slate-300'}`}
+              title="List View"
             >
               <IconList className="w-4 h-4" />
             </button>
+
           </div>
         </div>
       </div>

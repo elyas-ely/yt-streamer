@@ -16,7 +16,7 @@ export interface Bucket {
   objectCount: number;
 }
 
-export type ViewMode = 'grid' | 'list';
+export type ViewMode = 'grid' | 'grid-small' | 'list';
 
 export interface FileExplorerState {
   currentPath: string;

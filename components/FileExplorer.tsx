@@ -362,7 +362,10 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
             })}
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 md:gap-8">
+          <div className={viewMode === 'grid-small'
+            ? "grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-2 md:gap-4"
+            : "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 md:gap-8"
+          }>
             {objects.map(obj => {
               const isSelected = selectedKeys.includes(obj.key);
               const style = getAssetStyle(obj.key, obj.type);

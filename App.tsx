@@ -436,7 +436,7 @@ const App: React.FC = () => {
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-2 sm:p-4 md:p-8 custom-scrollbar">
           {storageView === 'local' ? (
-            <LocalFiles searchQuery={searchQuery} />
+            <LocalFiles searchQuery={searchQuery} viewMode={viewMode} />
           ) : (
             <FileExplorer
               objects={filteredObjects}
