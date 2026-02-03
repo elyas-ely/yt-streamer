@@ -1,7 +1,8 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { getLocalVideos, LocalVideo, getStreamStatus, startStream, stopStream, getStreamLogs } from '../services/localService';
+import { getLocalVideos, LocalVideo, getStreamStatus, startStream, stopStream, getStreamLogs, deleteLocalVideo } from '../services/localService';
 import { IconGrid, IconSearch, IconStorage, IconRefresh, IconClose } from './Icons';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
 
 interface LocalFilesProps {
     searchQuery: string;
@@ -23,6 +24,8 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery }) => {
     const [isLooping, setIsLooping] = useState(true);
     const [showLogs, setShowLogs] = useState(false);
     const [logs, setLogs] = useState<string[]>([]);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [videoToDelete, setVideoToDelete] = useState<string | null>(null);
     const logEndRef = useRef<HTMLDivElement>(null);
 
     const fetchVideos = useCallback(async () => {
@@ -95,6 +98,21 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery }) => {
             fetchStreamStatus();
         } catch (err: any) {
             alert(`Streaming Error: ${err.message}`);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!videoToDelete) return;
+
+        setIsDeleting(true);
+        try {
+            await deleteLocalVideo(videoToDelete);
+            await fetchVideos(); // Refresh list
+            setVideoToDelete(null);
+        } catch (err: any) {
+            alert(`Delete Error: ${err.message}`);
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -181,8 +199,8 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery }) => {
                                             disabled={streamStatus.isStreaming}
                                             title={isLooping ? "Looping Enabled" : "Looping Disabled"}
                                             className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 border-2 ${isLooping
-                                                    ? 'border-indigo-500 bg-indigo-500/20 text-indigo-400'
-                                                    : 'border-slate-700 bg-slate-800 text-slate-500 opacity-50'
+                                                ? 'border-indigo-500 bg-indigo-500/20 text-indigo-400'
+                                                : 'border-slate-700 bg-slate-800 text-slate-500 opacity-50'
                                                 } ${streamStatus.isStreaming ? 'cursor-not-allowed' : ''}`}
                                         >
                                             <IconRefresh className={`w-5 h-5 ${isLooping ? 'animate-spin-slow' : ''}`} />
@@ -198,6 +216,14 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery }) => {
                                             ) : (
                                                 <IconRefresh className="w-5 h-5" />
                                             )}
+                                        </button>
+                                        <button
+                                            onClick={() => setVideoToDelete(video.name)}
+                                            disabled={isCurrentlyStreaming}
+                                            title="Delete Local Video"
+                                            className={`w-10 h-10 bg-red-600/20 border border-red-500/30 rounded-2xl flex items-center justify-center text-red-400 shadow-lg hover:scale-110 active:scale-95 transition-all ${isCurrentlyStreaming ? 'opacity-30 cursor-not-allowed' : 'hover:bg-red-600 hover:text-white'}`}
+                                        >
+                                            <IconClose className="w-5 h-5" />
                                         </button>
                                         <a
                                             href={video.path}
@@ -263,6 +289,15 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery }) => {
                     </div>
                 </div>
             )}
+
+            <DeleteConfirmModal
+                isOpen={!!videoToDelete}
+                onClose={() => setVideoToDelete(null)}
+                onConfirm={handleDelete}
+                itemsCount={1}
+                isFolder={false}
+                isLoading={isDeleting}
+            />
         </div>
     );
 };

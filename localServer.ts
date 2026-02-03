@@ -238,6 +238,48 @@ export function localServerPlugin(): Plugin {
             return;
         }
 
+        // API to delete a local video
+        if (req.url === '/api/local/delete' && req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => {
+                body += chunk.toString();
+            });
+
+            req.on('end', async () => {
+                try {
+                    const { fileName } = JSON.parse(body);
+                    if (!fileName) {
+                        res.statusCode = 400;
+                        res.end(JSON.stringify({ error: 'fileName is required' }));
+                        return;
+                    }
+
+                    const videoPath = path.resolve(publicDir, fileName);
+                    if (!fs.existsSync(videoPath)) {
+                        res.statusCode = 404;
+                        res.end(JSON.stringify({ error: 'Video file not found' }));
+                        return;
+                    }
+
+                    // Check if the video is currently streaming
+                    if (currentStreamingVideo === fileName) {
+                        res.statusCode = 400;
+                        res.end(JSON.stringify({ error: 'Cannot delete a video that is currently streaming' }));
+                        return;
+                    }
+
+                    fs.unlinkSync(videoPath);
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({ message: 'Video deleted successfully', fileName }));
+
+                } catch (error: any) {
+                    res.statusCode = 500;
+                    res.end(JSON.stringify({ error: error.message }));
+                }
+            });
+            return;
+        }
+
         next();
     };
 

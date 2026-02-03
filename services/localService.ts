@@ -76,3 +76,20 @@ export const getStreamLogs = async (): Promise<{ logs: string[] }> => {
     }
     return response.json();
 };
+
+export const deleteLocalVideo = async (fileName: string): Promise<{ message: string; fileName: string }> => {
+    const response = await fetch('/api/local/delete', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ fileName }),
+    });
+
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete video');
+    }
+
+    return response.json();
+};
