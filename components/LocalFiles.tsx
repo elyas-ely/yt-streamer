@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { getLocalVideos, LocalVideo, getStreamStatus, startStream, stopStream, getStreamLogs, deleteLocalVideo } from '../services/localService';
-import { IconGrid, IconSearch, IconStorage, IconRefresh, IconClose } from './Icons';
+import { IconGrid, IconSearch, IconStorage, IconRefresh, IconClose, IconVideo } from './Icons';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 
 interface LocalFilesProps {
@@ -151,20 +151,28 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery }) => {
 
     return (
         <div className="relative">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in duration-700">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {filteredVideos.map((video) => {
                     const isCurrentlyStreaming = streamStatus.isStreaming && streamStatus.fileName === video.name;
+                    const extension = video.name.split('.').pop()?.toUpperCase();
+                    const formattedDate = new Date(video.lastModified).toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                    });
 
                     return (
                         <div
                             key={video.name}
-                            className={`group bg-slate-900/40 border rounded-[2.5rem] p-5 transition-all duration-500 hover:scale-[1.02] hover:shadow-[0_20px_40px_rgba(0,0,0,0.3)] ${isCurrentlyStreaming ? 'border-red-500/50 bg-red-500/5' : 'border-slate-800/60 hover:bg-slate-800/40 hover:border-indigo-500/30'
+                            className={`group relative bg-slate-900/40 border rounded-[2.5rem] p-5 transition-colors duration-300 ${isCurrentlyStreaming
+                                ? 'border-red-500/40 bg-red-500/[0.03] shadow-[0_20px_50px_rgba(239,68,68,0.15)]'
+                                : 'border-slate-800/60 hover:bg-slate-800/60 hover:border-indigo-500/40 hover:shadow-[0_10px_30px_rgba(0,0,0,0.3)]'
                                 }`}
                         >
-                            <div className="aspect-video relative rounded-3xl overflow-hidden bg-slate-950 mb-5 border border-slate-800/40 group-hover:border-indigo-500/30 transition-colors">
+                            <div className="aspect-video relative rounded-3xl overflow-hidden bg-slate-950 mb-5 border border-white/5 group-hover:border-indigo-500/30 transition-colors duration-300 shadow-inner">
                                 <video
                                     src={video.path}
-                                    className={`w-full h-full object-cover transition-opacity ${isCurrentlyStreaming ? 'opacity-100' : 'opacity-80 group-hover:opacity-100'}`}
+                                    className={`w-full h-full object-cover ${isCurrentlyStreaming ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}
                                     controls={false}
                                     muted
                                     onMouseEnter={(e) => (e.target as HTMLVideoElement).play()}
@@ -176,72 +184,87 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery }) => {
                                 />
 
                                 {isCurrentlyStreaming && (
-                                    <div className="absolute top-4 left-4 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full flex items-center gap-2 shadow-[0_4px_12px_rgba(220,38,38,0.5)] animate-pulse">
-                                        <div className="w-2 h-2 bg-white rounded-full"></div>
-                                        LIVE ON YOUTUBE
+                                    <div className="absolute top-4 left-4 bg-red-600 text-white text-[9px] font-black uppercase tracking-[0.2em] px-4 py-2 rounded-full flex items-center gap-2 shadow-[0_8px_20px_rgba(220,38,38,0.4)] backdrop-blur-md z-10">
+                                        <div className="w-1.5 h-1.5 bg-white rounded-full shadow-[0_0_8px_white]"></div>
+                                        BROADCASTING
                                     </div>
                                 )}
 
-                                <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent flex justify-between items-end backdrop-blur-[2px]">
-                                    <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{formatSize(video.size)}</span>
+                                <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-md border border-white/10 text-[9px] font-black text-white/80 uppercase tracking-widest px-3 py-1.5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                    {extension}
+                                </div>
+
+                                <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent flex justify-between items-end backdrop-blur-[1px]">
+                                    <div className="flex flex-col gap-1">
+                                        <span className="text-[10px] font-black text-indigo-400/90 uppercase tracking-[0.1em]">{formatSize(video.size)}</span>
+                                        <span className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">{formattedDate}</span>
+                                    </div>
                                     <div className="flex gap-2">
                                         {isCurrentlyStreaming && (
                                             <button
                                                 onClick={() => setShowLogs(true)}
-                                                className="w-10 h-10 bg-slate-800/80 rounded-2xl flex items-center justify-center text-indigo-400 hover:bg-slate-700 transition-all hover:scale-110 shadow-lg"
+                                                className="w-9 h-9 bg-white/10 hover:bg-white/20 backdrop-blur-xl rounded-xl flex items-center justify-center text-white transition-colors duration-300 border border-white/10 shadow-lg"
                                                 title="View Logs"
                                             >
-                                                <IconSearch className="w-5 h-5" />
+                                                <IconSearch className="w-4 h-4" />
                                             </button>
                                         )}
                                         <button
                                             onClick={() => setIsLooping(!isLooping)}
                                             disabled={streamStatus.isStreaming}
                                             title={isLooping ? "Looping Enabled" : "Looping Disabled"}
-                                            className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 border-2 ${isLooping
-                                                ? 'border-indigo-500 bg-indigo-500/20 text-indigo-400'
-                                                : 'border-slate-700 bg-slate-800 text-slate-500 opacity-50'
+                                            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors duration-300 border ${isLooping
+                                                ? 'border-indigo-500/50 bg-indigo-500/20 text-indigo-400'
+                                                : 'border-white/5 bg-white/5 text-slate-500 opacity-60'
                                                 } ${streamStatus.isStreaming ? 'cursor-not-allowed' : ''}`}
                                         >
-                                            <IconRefresh className={`w-5 h-5 ${isLooping ? 'animate-spin-slow' : ''}`} />
+                                            <IconRefresh className={`w-4 h-4 ${isLooping ? 'animate-spin-slow' : ''}`} />
                                         </button>
                                         <button
                                             onClick={() => handleToggleStream(video.name)}
                                             title={isCurrentlyStreaming ? "Stop Stream" : "Start YouTube Stream"}
-                                            className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-lg transition-all hover:scale-110 active:scale-95 ${isCurrentlyStreaming ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-800 hover:bg-slate-700'
+                                            className={`h-9 px-4 rounded-xl flex items-center gap-2 text-white shadow-xl transition-all active:scale-95 border border-white/10 ${isCurrentlyStreaming
+                                                ? 'bg-red-600 hover:bg-red-500 shadow-red-600/30'
+                                                : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/30'
                                                 }`}
                                         >
                                             {isCurrentlyStreaming ? (
-                                                <div className="w-3 h-3 bg-white rounded-sm"></div>
+                                                <>
+                                                    <div className="w-2.5 h-2.5 bg-white rounded-[2px] shadow-sm"></div>
+                                                    <span className="text-[10px] font-black uppercase tracking-widest">STOP</span>
+                                                </>
                                             ) : (
-                                                <IconRefresh className="w-5 h-5" />
+                                                <>
+                                                    <IconVideo className="w-4 h-4" />
+                                                    <span className="text-[10px] font-black uppercase tracking-widest">LIVE</span>
+                                                </>
                                             )}
                                         </button>
-                                        <button
-                                            onClick={() => setVideoToDelete(video.name)}
-                                            disabled={isCurrentlyStreaming}
-                                            title="Delete Local Video"
-                                            className={`w-10 h-10 bg-red-600/20 border border-red-500/30 rounded-2xl flex items-center justify-center text-red-400 shadow-lg hover:scale-110 active:scale-95 transition-all ${isCurrentlyStreaming ? 'opacity-30 cursor-not-allowed' : 'hover:bg-red-600 hover:text-white'}`}
-                                        >
-                                            <IconClose className="w-5 h-5" />
-                                        </button>
-                                        <a
-                                            href={video.path}
-                                            download={video.name}
-                                            title="Download to Device"
-                                            className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg hover:scale-110 active:scale-95 transition-transform"
-                                        >
-                                            <IconGrid className="w-5 h-5 -rotate-90" />
-                                        </a>
                                     </div>
                                 </div>
                             </div>
-                            <div className="px-1">
-                                <h4 className={`text-sm font-black uppercase tracking-widest truncate mb-2 ${isCurrentlyStreaming ? 'text-red-400' : 'text-white'}`}>{video.name}</h4>
-                                <div className="flex items-center gap-2">
-                                    <IconStorage className="w-3 h-3 text-slate-600" />
-                                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Local Drive</span>
+
+                            <div className="px-1 flex justify-between items-start gap-4">
+                                <div className="flex-1 min-w-0">
+                                    <h4 className={`text-[13px] font-black uppercase tracking-wider truncate mb-2 transition-colors duration-300 ${isCurrentlyStreaming ? 'text-red-400' : 'text-white group-hover:text-indigo-300'}`}>
+                                        {video.name.split('.')[0]}
+                                    </h4>
+                                    <div className="flex items-center gap-2 text-slate-500">
+                                        <div className={`w-1.5 h-1.5 rounded-full ${isCurrentlyStreaming ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-slate-700'}`}></div>
+                                        <span className="text-[9px] font-bold uppercase tracking-widest">{isCurrentlyStreaming ? 'Live Streaming' : 'Ready to Stream'}</span>
+                                    </div>
                                 </div>
+                                <button
+                                    onClick={() => setVideoToDelete(video.name)}
+                                    disabled={isCurrentlyStreaming}
+                                    title="Delete Local Video"
+                                    className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors duration-300 ${isCurrentlyStreaming
+                                        ? 'opacity-0 pointer-events-none'
+                                        : 'bg-red-500/10 text-red-500/60 hover:bg-red-500 hover:text-white border border-red-500/20'
+                                        }`}
+                                >
+                                    <IconClose className="w-4 h-4" />
+                                </button>
                             </div>
                         </div>
                     );
