@@ -103,13 +103,13 @@ export function localServerPlugin(): Plugin {
                     const writeStream = fs.createWriteStream(tempFilePath);
 
                     if (response.Body) {
-                        console.log(`Starting download of ${key} to ${tempFilePath}`);
+                        // console.log(`Starting download of ${key} to ${tempFilePath}`);
                         // @ts-ignore
                         response.Body.pipe(writeStream);
 
                         writeStream.on('finish', async () => {
                             writeStream.close();
-                            console.log(`Download finished for ${fileName}. Optimizing video...`);
+                            // console.log(`Download finished for ${fileName}. Optimizing video...`);
 
                             // Optimization: Move moov atom to the front for better web playback (faststart)
                             // This is crucial for 1GB+ videos to play without downloading the whole file first
@@ -126,7 +126,7 @@ export function localServerPlugin(): Plugin {
                                 try { fs.unlinkSync(tempFilePath); } catch (e) { }
 
                                 if (code === 0) {
-                                    console.log(`Optimization complete for ${fileName}`);
+                                    // console.log(`Optimization complete for ${fileName}`);
                                     res.setHeader('Content-Type', 'application/json');
                                     res.end(JSON.stringify({ message: 'Download and optimization complete', fileName }));
                                 } else {
@@ -212,7 +212,7 @@ export function localServerPlugin(): Plugin {
 
                     currentStreamProcess.on('exit', (code) => {
                         const msg = `FFmpeg exited with code ${code}`;
-                        console.log(msg);
+                        // console.log(msg);
                         appendLog(`--- STREAM TERMINATED ---`);
                         appendLog(msg);
                         if (code === 183) {
