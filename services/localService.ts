@@ -15,6 +15,7 @@ export const getLocalVideos = async (): Promise<LocalVideo[]> => {
 };
 
 export const saveToLocal = async (key: string): Promise<{ message: string; fileName: string }> => {
+    // Large files might take a long time to optimize, so we don't want a default timeout
     const response = await fetch('/api/local/download', {
         method: 'POST',
         headers: {
@@ -24,8 +25,14 @@ export const saveToLocal = async (key: string): Promise<{ message: string; fileN
     });
 
     if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to save to local');
+        let errorMsg = 'Failed to save to local';
+        try {
+            const error = await response.json();
+            errorMsg = error.error || errorMsg;
+        } catch (e) {
+            errorMsg = `HTTP Error ${response.status}: ${response.statusText}`;
+        }
+        throw new Error(errorMsg);
     }
 
     return response.json();

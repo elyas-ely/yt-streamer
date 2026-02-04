@@ -98,21 +98,52 @@ export function localServerPlugin(): Plugin {
                     }
 
                     const fileName = path.basename(key);
-                    const filePath = path.join(publicDir, fileName);
-                    const writeStream = fs.createWriteStream(filePath);
+                    const tempFilePath = path.join(publicDir, `temp_${Date.now()}_${fileName}`);
+                    const finalFilePath = path.join(publicDir, fileName);
+                    const writeStream = fs.createWriteStream(tempFilePath);
 
                     if (response.Body) {
+                        console.log(`Starting download of ${key} to ${tempFilePath}`);
                         // @ts-ignore
                         response.Body.pipe(writeStream);
 
-                        writeStream.on('finish', () => {
-                            res.setHeader('Content-Type', 'application/json');
-                            res.end(JSON.stringify({ message: 'Download complete', fileName }));
+                        writeStream.on('finish', async () => {
+                            writeStream.close();
+                            console.log(`Download finished for ${fileName}. Optimizing video...`);
+
+                            // Optimization: Move moov atom to the front for better web playback (faststart)
+                            // This is crucial for 1GB+ videos to play without downloading the whole file first
+                            const ffmpegArgs = ['-y', '-i', tempFilePath, '-c', 'copy', '-map_metadata', '0', '-movflags', '+faststart', finalFilePath];
+                            const optimizeProcess = spawn('ffmpeg', ffmpegArgs);
+
+                            let optimizeError = '';
+                            optimizeProcess.stderr?.on('data', (data) => {
+                                optimizeError += data.toString();
+                            });
+
+                            optimizeProcess.on('exit', (code) => {
+                                // Clean up temp file
+                                try { fs.unlinkSync(tempFilePath); } catch (e) { }
+
+                                if (code === 0) {
+                                    console.log(`Optimization complete for ${fileName}`);
+                                    res.setHeader('Content-Type', 'application/json');
+                                    res.end(JSON.stringify({ message: 'Download and optimization complete', fileName }));
+                                } else {
+                                    console.error(`Optimization failed for ${fileName} with code ${code}: ${optimizeError}`);
+                                    // If optimization fails, just move the original file to final location
+                                    fs.renameSync(tempFilePath, finalFilePath);
+                                    res.setHeader('Content-Type', 'application/json');
+                                    res.end(JSON.stringify({ message: 'Download complete (optimization failed, but file is saved)', fileName }));
+                                }
+                            });
                         });
 
                         writeStream.on('error', (err) => {
+                            console.error(`Write stream error for ${fileName}:`, err);
+                            try { fs.unlinkSync(tempFilePath); } catch (e) { }
                             res.statusCode = 500;
-                            res.end(JSON.stringify({ error: err.message }));
+                            res.end(JSON.stringify({ error: `File write error: ${err.message}` }));
                         });
                     } else {
                         res.statusCode = 500;
@@ -120,6 +151,7 @@ export function localServerPlugin(): Plugin {
                     }
 
                 } catch (error: any) {
+                    console.error(`S3 download error:`, error);
                     res.statusCode = 500;
                     res.end(JSON.stringify({ error: error.message }));
                 }
@@ -179,8 +211,13 @@ export function localServerPlugin(): Plugin {
                     currentStreamingVideo = fileName;
 
                     currentStreamProcess.on('exit', (code) => {
-                        console.log(`FFmpeg exited with code ${code}`);
-                        appendLog(`FFmpeg exited with code ${code}`);
+                        const msg = `FFmpeg exited with code ${code}`;
+                        console.log(msg);
+                        appendLog(`--- STREAM TERMINATED ---`);
+                        appendLog(msg);
+                        if (code === 183) {
+                            appendLog("Note: Error 183 often means the file is corrupt, incomplete, or the codec is incompatible with RTMP.");
+                        }
                         currentStreamProcess = null;
                         currentStreamingVideo = null;
                     });
