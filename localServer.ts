@@ -278,6 +278,38 @@ export function localServerPlugin(): Plugin {
         }
 
         // API to stop streaming
+        if (req.url === '/api/local/stream/stop' && req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => {
+                body += chunk.toString();
+            });
+
+            req.on('end', async () => {
+                try {
+                    const { streamKey } = JSON.parse(body);
+                    if (!streamKey) {
+                        res.statusCode = 400;
+                        res.end(JSON.stringify({ error: 'streamKey is required' }));
+                        return;
+                    }
+
+                    const state = activeStreams.get(streamKey);
+                    if (state) {
+                        state.process.kill();
+                        activeStreams.delete(streamKey);
+                        res.setHeader('Content-Type', 'application/json');
+                        res.end(JSON.stringify({ message: 'Stream stopped' }));
+                    } else {
+                        res.statusCode = 400;
+                        res.end(JSON.stringify({ error: 'No stream found for this key' }));
+                    }
+                } catch (error: any) {
+                    res.statusCode = 500;
+                    res.end(JSON.stringify({ error: error.message }));
+                }
+            });
+            return;
+        }
 
         // API to get stream status
         if (req.url === '/api/local/stream/status' && req.method === 'GET') {
