@@ -6,6 +6,25 @@ export interface LocalVideo {
     path: string;
 }
 
+export interface YouTubeChannel {
+    id: number;
+    title: string;
+    channel: string;
+    streamKey: string;
+    emoji?: string;
+}
+
+export interface ActiveStream {
+    streamKey: string;
+    fileName: string;
+    title: string;
+    channel: string;
+    emoji?: string;
+    startTime: number;
+    loop: boolean;
+    isStreaming: boolean;
+}
+
 export const getLocalVideos = async (): Promise<LocalVideo[]> => {
     const response = await fetch('/api/local/videos');
     if (!response.ok) {
@@ -14,8 +33,15 @@ export const getLocalVideos = async (): Promise<LocalVideo[]> => {
     return response.json();
 };
 
+export const getYouTubeChannels = async (): Promise<YouTubeChannel[]> => {
+    const response = await fetch('/api/local/youtube-channels');
+    if (!response.ok) {
+        throw new Error('Failed to fetch YouTube channels');
+    }
+    return response.json();
+};
+
 export const saveToLocal = async (key: string): Promise<{ message: string; fileName: string }> => {
-    // Large files might take a long time to optimize, so we don't want a default timeout
     const response = await fetch('/api/local/download', {
         method: 'POST',
         headers: {
@@ -38,13 +64,20 @@ export const saveToLocal = async (key: string): Promise<{ message: string; fileN
     return response.json();
 };
 
-export const startStream = async (fileName: string, loop: boolean = false): Promise<{ message: string; fileName: string }> => {
+export const startStream = async (params: {
+    fileName: string;
+    streamKey: string;
+    title: string;
+    channel: string;
+    emoji?: string;
+    loop: boolean
+}): Promise<{ message: string; fileName: string }> => {
     const response = await fetch('/api/local/stream/start', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ fileName, loop }),
+        body: JSON.stringify(params),
     });
 
     if (!response.ok) {
@@ -55,9 +88,13 @@ export const startStream = async (fileName: string, loop: boolean = false): Prom
     return response.json();
 };
 
-export const stopStream = async (): Promise<{ message: string }> => {
+export const stopStream = async (streamKey: string): Promise<{ message: string }> => {
     const response = await fetch('/api/local/stream/stop', {
         method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ streamKey }),
     });
 
     if (!response.ok) {
@@ -68,7 +105,7 @@ export const stopStream = async (): Promise<{ message: string }> => {
     return response.json();
 };
 
-export const getStreamStatus = async (): Promise<{ isStreaming: boolean; fileName: string | null }> => {
+export const getStreamStatus = async (): Promise<{ streams: ActiveStream[] }> => {
     const response = await fetch('/api/local/stream/status');
     if (!response.ok) {
         throw new Error('Failed to fetch stream status');
@@ -76,8 +113,8 @@ export const getStreamStatus = async (): Promise<{ isStreaming: boolean; fileNam
     return response.json();
 };
 
-export const getStreamLogs = async (): Promise<{ logs: string[] }> => {
-    const response = await fetch('/api/local/stream/logs');
+export const getStreamLogs = async (streamKey: string): Promise<{ logs: string[] }> => {
+    const response = await fetch(`/api/local/stream/logs?streamKey=${encodeURIComponent(streamKey)}`);
     if (!response.ok) {
         throw new Error('Failed to fetch stream logs');
     }
@@ -93,9 +130,20 @@ export const deleteLocalVideo = async (fileName: string): Promise<{ message: str
         body: JSON.stringify({ fileName }),
     });
 
+    return response.json();
+};
+
+export const stopAllStreams = async (): Promise<{ message: string }> => {
+    const response = await fetch('/api/local/stream/stop-all', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    });
+
     if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to delete video');
+        throw new Error(error.error || 'Failed to stop all streams');
     }
 
     return response.json();

@@ -8,16 +8,28 @@ import { spawn, ChildProcess } from 'child_process';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let currentStreamProcess: ChildProcess | null = null;
-let currentStreamingVideo: string | null = null;
-const MAX_LOG_LINES = 1000;
-let streamLogs: string[] = [];
+interface StreamState {
+    process: ChildProcess;
+    fileName: string;
+    title: string;
+    channel: string;
+    emoji: string;
+    logs: string[];
+    startTime: number;
+    loop: boolean;
+}
 
-const appendLog = (data: string) => {
+const activeStreams = new Map<string, StreamState>();
+const MAX_LOG_LINES = 1000;
+
+const appendLog = (streamKey: string, data: string) => {
+    const state = activeStreams.get(streamKey);
+    if (!state) return;
+
     const lines = data.split('\n');
-    streamLogs.push(...lines.filter(l => l.trim()));
-    if (streamLogs.length > MAX_LOG_LINES) {
-        streamLogs = streamLogs.slice(streamLogs.length - MAX_LOG_LINES);
+    state.logs.push(...lines.filter(l => l.trim()));
+    if (state.logs.length > MAX_LOG_LINES) {
+        state.logs = state.logs.slice(state.logs.length - MAX_LOG_LINES);
     }
 };
 
@@ -28,6 +40,25 @@ export function localServerPlugin(): Plugin {
         const ytKey = env['YT_KEY'];
 
         if (!req.url) return next();
+
+        // API to list YouTube channels from youtube.json
+        if (req.url === '/api/local/youtube-channels' && req.method === 'GET') {
+            try {
+                const configPath = path.resolve(__dirname, 'youtube.json');
+                if (fs.existsSync(configPath)) {
+                    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify(config.streams || []));
+                } else {
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify([]));
+                }
+            } catch (error: any) {
+                res.statusCode = 500;
+                res.end(JSON.stringify({ error: error.message }));
+            }
+            return;
+        }
 
         // API to list videos in /public
         if (req.url === '/api/local/videos' && req.method === 'GET') {
@@ -103,16 +134,11 @@ export function localServerPlugin(): Plugin {
                     const writeStream = fs.createWriteStream(tempFilePath);
 
                     if (response.Body) {
-                        // console.log(`Starting download of ${key} to ${tempFilePath}`);
                         // @ts-ignore
                         response.Body.pipe(writeStream);
 
                         writeStream.on('finish', async () => {
                             writeStream.close();
-                            // console.log(`Download finished for ${fileName}. Optimizing video...`);
-
-                            // Optimization: Move moov atom to the front for better web playback (faststart)
-                            // This is crucial for 1GB+ videos to play without downloading the whole file first
                             const ffmpegArgs = ['-y', '-i', tempFilePath, '-c', 'copy', '-map_metadata', '0', '-movflags', '+faststart', finalFilePath];
                             const optimizeProcess = spawn('ffmpeg', ffmpegArgs);
 
@@ -122,16 +148,13 @@ export function localServerPlugin(): Plugin {
                             });
 
                             optimizeProcess.on('exit', (code) => {
-                                // Clean up temp file
                                 try { fs.unlinkSync(tempFilePath); } catch (e) { }
 
                                 if (code === 0) {
-                                    // console.log(`Optimization complete for ${fileName}`);
                                     res.setHeader('Content-Type', 'application/json');
                                     res.end(JSON.stringify({ message: 'Download and optimization complete', fileName }));
                                 } else {
                                     console.error(`Optimization failed for ${fileName} with code ${code}: ${optimizeError}`);
-                                    // If optimization fails, just move the original file to final location
                                     fs.renameSync(tempFilePath, finalFilePath);
                                     res.setHeader('Content-Type', 'application/json');
                                     res.end(JSON.stringify({ message: 'Download complete (optimization failed, but file is saved)', fileName }));
@@ -168,22 +191,16 @@ export function localServerPlugin(): Plugin {
 
             req.on('end', async () => {
                 try {
-                    const { fileName, loop } = JSON.parse(body);
-                    if (!fileName) {
+                    const { fileName, streamKey, title, channel, emoji, loop } = JSON.parse(body);
+                    if (!fileName || !streamKey) {
                         res.statusCode = 400;
-                        res.end(JSON.stringify({ error: 'fileName is required' }));
+                        res.end(JSON.stringify({ error: 'fileName and streamKey are required' }));
                         return;
                     }
 
-                    if (currentStreamProcess) {
+                    if (activeStreams.has(streamKey)) {
                         res.statusCode = 400;
-                        res.end(JSON.stringify({ error: 'A stream is already running' }));
-                        return;
-                    }
-
-                    if (!ytKey) {
-                        res.statusCode = 500;
-                        res.end(JSON.stringify({ error: 'YouTube Stream Key (YT_KEY) not found in .env.local' }));
+                        res.end(JSON.stringify({ error: 'This channel is already streaming' }));
                         return;
                     }
 
@@ -194,44 +211,47 @@ export function localServerPlugin(): Plugin {
                         return;
                     }
 
-                    const rtmpUrl = `rtmp://a.rtmp.youtube.com/live2/${ytKey}`;
+                    const rtmpUrl = `rtmp://a.rtmp.youtube.com/live2/${streamKey}`;
 
-                    // ffmpeg [-stream_loop -1] -re -i video.mp4 -c copy -f flv rtmp://...
                     const ffmpegArgs = [];
                     if (loop) {
                         ffmpegArgs.push('-stream_loop', '-1');
                     }
+                    // -re (read input at native frame rate), -i (input), -c copy (no re-encoding), -f flv (output format)
                     ffmpegArgs.push('-re', '-i', videoPath, '-c', 'copy', '-f', 'flv', rtmpUrl);
 
-                    currentStreamProcess = spawn('ffmpeg', ffmpegArgs);
+                    const process = spawn('ffmpeg', ffmpegArgs);
 
-                    streamLogs = []; // Clear logs for new stream
-                    appendLog(`Starting stream for ${fileName} with loop=${loop}`);
+                    const streamState: StreamState = {
+                        process,
+                        fileName,
+                        title: title || 'Live Stream',
+                        channel: channel || 'Unknown Channel',
+                        emoji: emoji || '🔴',
+                        logs: [`Starting stream for ${fileName} on ${channel}`],
+                        startTime: Date.now(),
+                        loop: !!loop
+                    };
 
-                    currentStreamingVideo = fileName;
+                    activeStreams.set(streamKey, streamState);
 
-                    currentStreamProcess.on('exit', (code) => {
+                    process.on('exit', (code) => {
                         const msg = `FFmpeg exited with code ${code}`;
-                        // console.log(msg);
-                        appendLog(`--- STREAM TERMINATED ---`);
-                        appendLog(msg);
-                        if (code === 183) {
-                            appendLog("Note: Error 183 often means the file is corrupt, incomplete, or the codec is incompatible with RTMP.");
-                        }
-                        currentStreamProcess = null;
-                        currentStreamingVideo = null;
+                        appendLog(streamKey, `--- STREAM TERMINATED ---`);
+                        appendLog(streamKey, msg);
+                        activeStreams.delete(streamKey);
                     });
 
-                    currentStreamProcess.stderr?.on('data', (data) => {
-                        appendLog(data.toString());
+                    process.stderr?.on('data', (data) => {
+                        appendLog(streamKey, data.toString());
                     });
 
-                    currentStreamProcess.stdout?.on('data', (data) => {
-                        appendLog(data.toString());
+                    process.stdout?.on('data', (data) => {
+                        appendLog(streamKey, data.toString());
                     });
 
                     res.setHeader('Content-Type', 'application/json');
-                    res.end(JSON.stringify({ message: 'Stream started', fileName }));
+                    res.end(JSON.stringify({ message: 'Stream started', fileName, channel }));
 
                 } catch (error: any) {
                     res.statusCode = 500;
@@ -241,36 +261,57 @@ export function localServerPlugin(): Plugin {
             return;
         }
 
-        // API to stop streaming
-        if (req.url === '/api/local/stream/stop' && req.method === 'POST') {
-            if (currentStreamProcess) {
-                currentStreamProcess.kill();
-                currentStreamProcess = null;
-                currentStreamingVideo = null;
+        // API to stop all streaming
+        if (req.url === '/api/local/stream/stop-all' && req.method === 'POST') {
+            try {
+                for (const [key, state] of activeStreams.entries()) {
+                    state.process.kill();
+                }
+                activeStreams.clear();
                 res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ message: 'Stream stopped' }));
-            } else {
-                res.statusCode = 400;
-                res.end(JSON.stringify({ error: 'No stream is currently running' }));
+                res.end(JSON.stringify({ message: 'All streams stopped' }));
+            } catch (error: any) {
+                res.statusCode = 500;
+                res.end(JSON.stringify({ error: error.message }));
             }
             return;
         }
 
+        // API to stop streaming
+
         // API to get stream status
         if (req.url === '/api/local/stream/status' && req.method === 'GET') {
-            res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({
-                isStreaming: !!currentStreamProcess,
-                fileName: currentStreamingVideo
+            const streams = Array.from(activeStreams.entries()).map(([key, state]) => ({
+                streamKey: key,
+                fileName: state.fileName,
+                title: state.title,
+                channel: state.channel,
+                emoji: state.emoji,
+                startTime: state.startTime,
+                loop: state.loop,
+                isStreaming: true
             }));
+
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ streams }));
             return;
         }
 
         // API to get stream logs
-        if (req.url === '/api/local/stream/logs' && req.method === 'GET') {
+        if (req.url.startsWith('/api/local/stream/logs') && req.method === 'GET') {
+            const url = new URL(req.url, `http://${req.headers.host}`);
+            const streamKey = url.searchParams.get('streamKey');
+
+            if (!streamKey) {
+                res.statusCode = 400;
+                res.end(JSON.stringify({ error: 'streamKey is required' }));
+                return;
+            }
+
+            const state = activeStreams.get(streamKey);
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify({
-                logs: streamLogs
+                logs: state ? state.logs : []
             }));
             return;
         }
@@ -298,8 +339,9 @@ export function localServerPlugin(): Plugin {
                         return;
                     }
 
-                    // Check if the video is currently streaming
-                    if (currentStreamingVideo === fileName) {
+                    // Check if the video is currently used in any stream
+                    const isStreaming = Array.from(activeStreams.values()).some(s => s.fileName === fileName);
+                    if (isStreaming) {
                         res.statusCode = 400;
                         res.end(JSON.stringify({ error: 'Cannot delete a video that is currently streaming' }));
                         return;

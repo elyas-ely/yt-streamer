@@ -1,8 +1,20 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { getLocalVideos, LocalVideo, getStreamStatus, startStream, stopStream, getStreamLogs, deleteLocalVideo } from '../services/localService';
-import { IconGrid, IconSearch, IconStorage, IconRefresh, IconClose, IconVideo } from './Icons';
+import {
+    getLocalVideos,
+    LocalVideo,
+    getStreamStatus,
+    startStream,
+    getYouTubeChannels,
+    YouTubeChannel,
+    ActiveStream,
+    deleteLocalVideo
+} from '../services/localService';
+import { IconGrid, IconSearch, IconStorage, IconRefresh, IconClose, IconVideo, IconTrash } from './Icons';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
+import { ChannelSelectorModal } from './ChannelSelectorModal';
+import { StreamingManager } from './StreamingManager';
+import { VideoMenu } from './VideoMenu';
 
 import { ViewMode } from '../types';
 
@@ -19,17 +31,23 @@ const formatSize = (bytes: number) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
+type ActiveTab = 'files' | 'streaming';
+
 export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery, viewMode }) => {
     const [videos, setVideos] = useState<LocalVideo[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [streamStatus, setStreamStatus] = useState<{ isStreaming: boolean; fileName: string | null }>({ isStreaming: false, fileName: null });
+    const [activeStreams, setActiveStreams] = useState<ActiveStream[]>([]);
+    const [channels, setChannels] = useState<YouTubeChannel[]>([]);
     const [isLooping, setIsLooping] = useState(true);
-    const [showLogs, setShowLogs] = useState(false);
-    const [logs, setLogs] = useState<string[]>([]);
+    const [activeTab, setActiveTab] = useState<ActiveTab>('files');
+
+    // Channel selection state
+    const [showChannelSelector, setShowChannelSelector] = useState(false);
+    const [videoToStream, setVideoToStream] = useState<string | null>(null);
+
     const [isDeleting, setIsDeleting] = useState(false);
     const [videoToDelete, setVideoToDelete] = useState<string | null>(null);
-    const logEndRef = useRef<HTMLDivElement>(null);
 
     const fetchVideos = useCallback(async () => {
         try {
@@ -45,60 +63,59 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery, viewMode })
     const fetchStreamStatus = useCallback(async () => {
         try {
             const status = await getStreamStatus();
-            setStreamStatus(status);
+            setActiveStreams(status.streams);
         } catch (err) {
             console.error("Failed to fetch stream status", err);
         }
     }, []);
 
-    const fetchLogs = useCallback(async () => {
+    const fetchChannels = useCallback(async () => {
         try {
-            const data = await getStreamLogs();
-            setLogs(data.logs);
+            const data = await getYouTubeChannels();
+            setChannels(data);
         } catch (err) {
-            console.error("Failed to fetch logs", err);
+            console.error("Failed to fetch channels", err);
         }
     }, []);
 
     useEffect(() => {
         fetchVideos();
         fetchStreamStatus();
+        fetchChannels();
 
         const statusInterval = setInterval(() => {
             fetchStreamStatus();
         }, 5000);
 
         return () => clearInterval(statusInterval);
-    }, [fetchVideos, fetchStreamStatus]);
+    }, [fetchVideos, fetchStreamStatus, fetchChannels]);
 
-    useEffect(() => {
-        let logsInterval: any = null;
-        if (showLogs) {
-            fetchLogs();
-            logsInterval = setInterval(fetchLogs, 2000);
-        }
-        return () => {
-            if (logsInterval) clearInterval(logsInterval);
-        };
-    }, [showLogs, fetchLogs]);
+    const handleStartStreamClick = (fileName: string) => {
+        setVideoToStream(fileName);
+        setShowChannelSelector(true);
+    };
 
-    useEffect(() => {
-        if (showLogs && logEndRef.current) {
-            logEndRef.current.scrollIntoView({ behavior: 'smooth' });
-        }
-    }, [logs, showLogs]);
+    const handleChannelSelect = async (selectedChannels: YouTubeChannel[]) => {
+        if (!videoToStream) return;
 
-    const handleToggleStream = async (fileName: string) => {
         try {
-            if (streamStatus.isStreaming && streamStatus.fileName === fileName) {
-                await stopStream();
-            } else if (!streamStatus.isStreaming) {
-                await startStream(fileName, isLooping);
-            } else {
-                alert("A stream is already running. Please stop it before starting a new one.");
-                return;
-            }
+            const promises = selectedChannels.map(channel =>
+                startStream({
+                    fileName: videoToStream,
+                    streamKey: channel.streamKey,
+                    title: channel.title,
+                    channel: channel.channel,
+                    emoji: channel.emoji || '🔴',
+                    loop: isLooping
+                })
+            );
+
+            await Promise.all(promises);
+
+            setShowChannelSelector(false);
+            setVideoToStream(null);
             fetchStreamStatus();
+            setActiveTab('streaming');
         } catch (err: any) {
             alert(`Streaming Error: ${err.message}`);
         }
@@ -121,7 +138,7 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery, viewMode })
 
     const filteredVideos = videos.filter(v => v.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    if (isLoading) {
+    if (isLoading && activeTab === 'files') {
         return (
             <div className="flex flex-col items-center justify-center h-64 gap-4">
                 <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
@@ -138,23 +155,48 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery, viewMode })
         );
     }
 
-    if (filteredVideos.length === 0) {
-        return (
-            <div className="flex flex-col items-center justify-center p-20 border-2 border-dashed border-slate-800/60 rounded-[3rem] bg-slate-900/40">
-                <div className="w-20 h-20 bg-slate-800/10 rounded-full flex items-center justify-center mb-6 border border-slate-800/40 opacity-40">
-                    <IconSearch className="w-8 h-8 text-slate-400" />
-                </div>
-                <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-2">No Local Videos Found</h3>
-                <p className="text-sm text-slate-500 font-bold uppercase tracking-widest text-center max-w-xs">
-                    {searchQuery ? `No videos matching "${searchQuery}" found in your local /public folder.` : "Download videos from R2 to see them here."}
-                </p>
-            </div>
-        );
-    }
-
     return (
         <div className="relative">
-            {viewMode === 'list' ? (
+            {/* Tab Navigation */}
+            <div className="flex gap-2 mb-8 bg-slate-900/60 p-1.5 rounded-3xl border border-slate-800/40 w-fit">
+                <button
+                    onClick={() => setActiveTab('files')}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'files'
+                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+                        : 'text-slate-500 hover:text-slate-300'
+                        }`}
+                >
+                    <IconStorage className="w-4 h-4" />
+                    Local Files
+                </button>
+                <button
+                    onClick={() => setActiveTab('streaming')}
+                    className={`flex items-center gap-3 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all relative ${activeTab === 'streaming'
+                        ? 'bg-red-600 text-white shadow-lg shadow-red-600/20'
+                        : 'text-slate-500 hover:text-slate-300'
+                        }`}
+                >
+                    <IconVideo className="w-4 h-4" />
+                    Streaming
+                    {activeStreams.length > 0 && (
+                        <span className="flex h-2 w-2 rounded-full bg-white absolute top-2 right-2 animate-pulse"></span>
+                    )}
+                </button>
+            </div>
+
+            {activeTab === 'streaming' ? (
+                <StreamingManager />
+            ) : filteredVideos.length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-20 border-2 border-dashed border-slate-800/60 rounded-[3rem] bg-slate-900/40">
+                    <div className="w-20 h-20 bg-slate-800/10 rounded-full flex items-center justify-center mb-6 border border-slate-800/40 opacity-40">
+                        <IconSearch className="w-8 h-8 text-slate-400" />
+                    </div>
+                    <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-2">No Local Videos Found</h3>
+                    <p className="text-sm text-slate-500 font-bold uppercase tracking-widest text-center max-w-xs">
+                        {searchQuery ? `No videos matching "${searchQuery}" found in your local /public folder.` : "Download videos from R2 to see them here."}
+                    </p>
+                </div>
+            ) : viewMode === 'list' ? (
                 <div className="flex flex-col gap-2">
                     <div className="flex items-center px-4 py-2 text-slate-600 text-[10px] font-black uppercase tracking-[0.2em] border-b border-slate-800/40 mb-2">
                         <div className="flex-1">Video Details</div>
@@ -163,7 +205,8 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery, viewMode })
                         <div className="w-24 shrink-0 text-right">Actions</div>
                     </div>
                     {filteredVideos.map((video) => {
-                        const isCurrentlyStreaming = streamStatus.isStreaming && streamStatus.fileName === video.name;
+                        const streamingInfo = activeStreams.filter(s => s.fileName === video.name);
+                        const isCurrentlyStreaming = streamingInfo.length > 0;
                         const formattedDate = new Date(video.lastModified).toLocaleDateString(undefined, {
                             month: 'short',
                             day: 'numeric',
@@ -191,10 +234,18 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery, viewMode })
                                         <h4 className={`text-sm font-black uppercase tracking-wider truncate transition-colors ${isCurrentlyStreaming ? 'text-red-400' : 'text-white'}`}>
                                             {video.name.split('.')[0]}
                                         </h4>
-                                        <span className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-2">
-                                            <div className={`w-1 h-1 rounded-full ${isCurrentlyStreaming ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-slate-700'}`}></div>
-                                            {isCurrentlyStreaming ? 'Live' : 'Ready'}
-                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-2">
+                                                <div className={`w-1 h-1 rounded-full ${isCurrentlyStreaming ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-slate-700'}`}></div>
+                                                {isCurrentlyStreaming ? 'Live' : 'Ready'}
+                                            </span>
+                                            {isCurrentlyStreaming && streamingInfo.map(s => (
+                                                <span key={s.streamKey} className="text-[8px] bg-red-600/20 text-red-400 px-2 py-0.5 rounded-full font-black uppercase tracking-widest border border-red-500/20 flex items-center gap-1">
+                                                    {s.emoji && <span>{s.emoji}</span>}
+                                                    {s.channel}
+                                                </span>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
 
@@ -207,27 +258,11 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery, viewMode })
                                 </div>
 
                                 <div className="w-24 shrink-0 flex justify-end gap-2 pr-1">
-                                    <button
-                                        onClick={() => setIsLooping(!isLooping)}
-                                        disabled={streamStatus.isStreaming}
-                                        title={isLooping ? "Looping Enabled" : "Looping Disabled"}
-                                        className={`p-1.5 rounded-lg transition-all border ${isLooping ? 'border-indigo-500/50 bg-indigo-500/20 text-indigo-400' : 'border-white/5 bg-white/5 text-slate-500'}`}
-                                    >
-                                        <IconRefresh className={`w-3.5 h-3.5 ${isLooping ? 'animate-spin-slow' : ''}`} />
-                                    </button>
-                                    <button
-                                        onClick={() => handleToggleStream(video.name)}
-                                        className={`p-1.5 rounded-lg text-white transition-all ${isCurrentlyStreaming ? 'bg-red-600 hover:bg-red-500' : 'bg-indigo-600 hover:bg-indigo-500'}`}
-                                    >
-                                        <IconVideo className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                        onClick={() => setVideoToDelete(video.name)}
-                                        disabled={isCurrentlyStreaming}
-                                        className={`p-1.5 rounded-lg text-red-500/60 hover:bg-red-500 hover:text-white transition-all ${isCurrentlyStreaming ? 'opacity-0' : ''}`}
-                                    >
-                                        <IconClose className="w-3.5 h-3.5" />
-                                    </button>
+                                    <VideoMenu
+                                        onStartStream={() => handleStartStreamClick(video.name)}
+                                        onDelete={() => setVideoToDelete(video.name)}
+                                        isStreaming={isCurrentlyStreaming}
+                                    />
                                 </div>
                             </div>
                         );
@@ -239,7 +274,8 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery, viewMode })
                     : "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 md:gap-6"
                 }>
                     {filteredVideos.map((video) => {
-                        const isCurrentlyStreaming = streamStatus.isStreaming && streamStatus.fileName === video.name;
+                        const streamingInfo = activeStreams.filter(s => s.fileName === video.name);
+                        const isCurrentlyStreaming = streamingInfo.length > 0;
                         const extension = video.name.split('.').pop()?.toUpperCase();
                         const formattedDate = new Date(video.lastModified).toLocaleDateString(undefined, {
                             month: 'short',
@@ -287,46 +323,11 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery, viewMode })
                                             <span className="text-[5px] md:text-[8px] font-bold text-slate-500 uppercase tracking-tighter">{formattedDate}</span>
                                         </div>
                                         <div className="flex gap-1 md:gap-2">
-                                            {isCurrentlyStreaming && (
-                                                <button
-                                                    onClick={() => setShowLogs(true)}
-                                                    className="w-5 h-5 md:w-9 md:h-9 bg-white/10 hover:bg-white/20 backdrop-blur-xl rounded-md md:rounded-xl flex items-center justify-center text-white transition-colors duration-300 border border-white/10 shadow-lg"
-                                                    title="View Logs"
-                                                >
-                                                    <IconSearch className="w-2.5 md:w-4" />
-                                                </button>
-                                            )}
-                                            <button
-                                                onClick={() => setIsLooping(!isLooping)}
-                                                disabled={streamStatus.isStreaming}
-                                                title={isLooping ? "Looping Enabled" : "Looping Disabled"}
-                                                className={`w-5 h-5 md:w-9 md:h-9 rounded-md md:rounded-xl flex items-center justify-center transition-colors duration-300 border ${isLooping
-                                                    ? 'border-indigo-500/50 bg-indigo-500/20 text-indigo-400'
-                                                    : 'border-white/5 bg-white/5 text-slate-500 opacity-60'
-                                                    } ${streamStatus.isStreaming ? 'cursor-not-allowed' : ''}`}
-                                            >
-                                                <IconRefresh className={`w-2.5 md:w-4 ${isLooping ? 'animate-spin-slow' : ''}`} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleToggleStream(video.name)}
-                                                title={isCurrentlyStreaming ? "Stop Stream" : "Start YouTube Stream"}
-                                                className={`h-5 md:h-9 px-1.5 md:px-4 rounded-md md:rounded-xl flex items-center gap-1 md:gap-2 text-white shadow-xl transition-all active:scale-95 border border-white/10 ${isCurrentlyStreaming
-                                                    ? 'bg-red-600 hover:bg-red-500 shadow-red-600/30'
-                                                    : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/30'
-                                                    }`}
-                                            >
-                                                {isCurrentlyStreaming ? (
-                                                    <>
-                                                        <div className="w-1 md:w-2.5 h-1 md:h-2.5 bg-white rounded-[1px] md:rounded-[2px] shadow-sm"></div>
-                                                        <span className="text-[6px] md:text-[10px] font-black uppercase tracking-widest italic md:not-italic">STOP</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <IconVideo className="w-2.5 md:w-4" />
-                                                        <span className="text-[6px] md:text-[10px] font-black uppercase tracking-widest">LIVE</span>
-                                                    </>
-                                                )}
-                                            </button>
+                                            <VideoMenu
+                                                onStartStream={() => handleStartStreamClick(video.name)}
+                                                onDelete={() => setVideoToDelete(video.name)}
+                                                isStreaming={isCurrentlyStreaming}
+                                            />
                                         </div>
                                     </div>
                                 </div>
@@ -336,24 +337,21 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery, viewMode })
                                         <h4 className={`text-[9px] md:text-[13px] font-black uppercase tracking-wider truncate mb-0 md:mb-2 transition-colors duration-300 ${isCurrentlyStreaming ? 'text-red-400' : 'text-white group-hover:text-indigo-300'}`}>
                                             {video.name.split('.')[0]}
                                         </h4>
-                                        <div className="flex items-center gap-0.5 md:gap-2 text-slate-500">
-                                            <div className={`w-0.5 md:w-1.5 h-0.5 md:h-1.5 rounded-full ${isCurrentlyStreaming ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-slate-700'}`}></div>
-                                            <span className="text-[5px] md:text-[9px] font-bold uppercase tracking-widest">
-                                                {isCurrentlyStreaming ? 'Live' : 'Ready'}
-                                            </span>
+                                        <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
+                                            <div className="flex items-center gap-1 md:gap-2 text-slate-500">
+                                                <div className={`w-0.5 md:w-1.5 h-0.5 md:h-1.5 rounded-full ${isCurrentlyStreaming ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-slate-700'}`}></div>
+                                                <span className="text-[5px] md:text-[9px] font-bold uppercase tracking-widest">
+                                                    {isCurrentlyStreaming ? 'Live' : 'Ready'}
+                                                </span>
+                                            </div>
+                                            {isCurrentlyStreaming && streamingInfo.map(s => (
+                                                <span key={s.streamKey} className="text-[6px] md:text-[8px] bg-red-600/20 text-red-400 px-1.5 md:px-2 py-0.5 rounded-full font-black uppercase tracking-widest border border-red-500/20 flex items-center gap-1">
+                                                    {s.emoji && <span>{s.emoji}</span>}
+                                                    {s.channel}
+                                                </span>
+                                            ))}
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={() => setVideoToDelete(video.name)}
-                                        disabled={isCurrentlyStreaming}
-                                        title="Delete Local Video"
-                                        className={`w-5 h-5 md:w-8 md:h-8 rounded-md md:rounded-xl flex items-center justify-center transition-colors duration-300 ${isCurrentlyStreaming
-                                            ? 'opacity-0 pointer-events-none'
-                                            : 'bg-red-500/10 text-red-500/60 hover:bg-red-500 hover:text-white border border-red-500/20'
-                                            }`}
-                                    >
-                                        <IconClose className="w-2.5 md:w-4" />
-                                    </button>
                                 </div>
                             </div>
                         );
@@ -361,47 +359,16 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery, viewMode })
                 </div>
             )}
 
-            {showLogs && (
-                <div className="fixed inset-0 z-50 flex items-end justify-center pointer-events-none p-6">
-                    <div className="w-full max-w-4xl bg-slate-900/95 border border-slate-700 rounded-3xl shadow-2xl backdrop-blur-xl pointer-events-auto overflow-hidden animate-in slide-in-from-bottom duration-500">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
-                            <div className="flex items-center gap-3">
-                                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                                <h3 className="text-xs font-black text-white uppercase tracking-widest">Stream Logs: {streamStatus.fileName}</h3>
-                            </div>
-                            <button
-                                onClick={() => setShowLogs(false)}
-                                className="p-2 hover:bg-slate-800 rounded-xl transition-colors text-slate-400 hover:text-white"
-                            >
-                                <IconClose className="w-5 h-5" />
-                            </button>
-                        </div>
-                        <div className="h-64 overflow-y-auto p-4 font-mono text-[10px] text-slate-300 custom-scrollbar bg-black/50">
-                            {logs.length > 0 ? (
-                                logs.map((log, i) => (
-                                    <div key={i} className="mb-1 opacity-80 border-l border-indigo-500/30 pl-3 py-0.5 hover:bg-white/5 transition-colors">
-                                        {log}
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="flex items-center justify-center h-full text-slate-500 uppercase tracking-widest font-bold">
-                                    Initializing logs...
-                                </div>
-                            )}
-                            <div ref={logEndRef} />
-                        </div>
-                        <div className="px-6 py-2 bg-slate-800/30 flex justify-between items-center">
-                            <span className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">Circular Buffer: {logs.length} / 1000 lines</span>
-                            <button
-                                onClick={() => setLogs([])}
-                                className="text-[8px] font-black text-indigo-400 hover:text-indigo-300 uppercase tracking-widest"
-                            >
-                                Clear View
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ChannelSelectorModal
+                isOpen={showChannelSelector}
+                onClose={() => {
+                    setShowChannelSelector(false);
+                    setVideoToStream(null);
+                }}
+                onSelect={handleChannelSelect}
+                channels={channels}
+                fileName={videoToStream || ''}
+            />
 
             <DeleteConfirmModal
                 isOpen={!!videoToDelete}
