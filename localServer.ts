@@ -20,7 +20,7 @@ interface StreamState {
 }
 
 const activeStreams = new Map<string, StreamState>();
-const MAX_LOG_LINES = 1000;
+const MAX_LOG_LINES = 10;
 
 const appendLog = (streamKey: string, data: string) => {
     const state = activeStreams.get(streamKey);
