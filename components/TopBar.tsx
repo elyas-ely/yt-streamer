@@ -94,7 +94,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   return (
     <header className="bg-slate-900/80 backdrop-blur-md border-b border-slate-800/60 px-4 md:px-8 py-4 sticky top-0 z-30 transition-all overflow-hidden">
-      {/* Global Progress Bar */}
+      {/* Global Progress -- Bar */}
       {(activeUploads.length > 0 || isLoading) && (
         <div className="absolute top-0 left-0 right-0 h-0.5 bg-indigo-500/10 z-50 overflow-hidden">
           <div
