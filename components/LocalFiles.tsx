@@ -367,6 +367,7 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery, viewMode })
                 }}
                 onSelect={handleChannelSelect}
                 channels={channels}
+                activeStreams={activeStreams}
                 fileName={videoToStream || ''}
             />
 

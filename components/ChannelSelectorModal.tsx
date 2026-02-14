@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { YouTubeChannel } from '../services/localService';
+import { YouTubeChannel, ActiveStream } from '../services/localService';
 import { IconClose, IconVideo } from './Icons';
 
 interface ChannelSelectorModalProps {
@@ -8,6 +8,7 @@ interface ChannelSelectorModalProps {
     onClose: () => void;
     onSelect: (channels: YouTubeChannel[]) => void;
     channels: YouTubeChannel[];
+    activeStreams: ActiveStream[];
     fileName: string;
 }
 
@@ -16,6 +17,7 @@ export const ChannelSelectorModal: React.FC<ChannelSelectorModalProps> = ({
     onClose,
     onSelect,
     channels,
+    activeStreams,
     fileName
 }) => {
     const [selectedChannelIds, setSelectedChannelIds] = useState<Set<number>>(new Set());
@@ -94,34 +96,52 @@ export const ChannelSelectorModal: React.FC<ChannelSelectorModalProps> = ({
 
                             {channels.map((channel) => {
                                 const isSelected = selectedChannelIds.has(channel.id);
+                                const isAlreadyRunning = activeStreams.some(s => s.streamKey === channel.streamKey);
+
                                 return (
                                     <button
                                         key={channel.id}
-                                        onClick={() => toggleChannel(channel.id)}
+                                        onClick={() => !isAlreadyRunning && toggleChannel(channel.id)}
+                                        disabled={isAlreadyRunning}
                                         className={`group flex items-center gap-4 p-4 rounded-2xl transition-all text-left border ${isSelected
-                                            ? 'bg-indigo-600/20 border-indigo-500/50'
-                                            : 'bg-slate-800/30 border-slate-800 hover:border-indigo-500/30'
+                                                ? 'bg-indigo-600/20 border-indigo-500/50'
+                                                : isAlreadyRunning
+                                                    ? 'bg-red-500/5 border-red-500/20 opacity-80 cursor-not-allowed'
+                                                    : 'bg-slate-800/30 border-slate-800 hover:border-indigo-500/30'
                                             }`}
                                     >
-                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center border transition-colors ${isSelected ? 'bg-indigo-600 border-indigo-400' : 'bg-slate-900 border-white/5'
+                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center border transition-colors ${isSelected ? 'bg-indigo-600 border-indigo-400' :
+                                                isAlreadyRunning ? 'bg-red-950/40 border-red-500/20' :
+                                                    'bg-slate-900 border-white/5'
                                             }`}>
                                             {channel.emoji ? (
-                                                <span className="text-2xl">{channel.emoji}</span>
+                                                <span className={`text-2xl ${isAlreadyRunning ? 'opacity-40 grayscale-[0.5]' : ''}`}>{channel.emoji}</span>
                                             ) : (
-                                                <IconVideo className={`w-6 h-6 ${isSelected ? 'text-white' : 'text-indigo-400'}`} />
+                                                <IconVideo className={`w-6 h-6 ${isSelected ? 'text-white' : isAlreadyRunning ? 'text-red-500/40' : 'text-indigo-400'}`} />
                                             )}
                                         </div>
                                         <div className="flex-1">
-                                            <h4 className={`text-sm font-black uppercase tracking-wider transition-colors ${isSelected ? 'text-indigo-300' : 'text-white'}`}>
-                                                {channel.title}
-                                            </h4>
-                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                                            <div className="flex items-center gap-2">
+                                                <h4 className={`text-sm font-black uppercase tracking-wider transition-colors ${isSelected ? 'text-indigo-300' : isAlreadyRunning ? 'text-red-400/60' : 'text-white'}`}>
+                                                    {channel.title}
+                                                </h4>
+                                                {isAlreadyRunning && (
+                                                    <span className="flex items-center gap-1.5 px-2 py-0.5 bg-red-600 rounded-full">
+                                                        <div className="w-1 h-1 bg-white rounded-full animate-pulse"></div>
+                                                        <span className="text-[7px] font-black text-white uppercase tracking-widest">RUNNING</span>
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className={`text-[10px] font-bold uppercase tracking-widest ${isAlreadyRunning ? 'text-red-900/40' : 'text-slate-500'}`}>
                                                 {channel.channel}
                                             </p>
                                         </div>
-                                        <div className={`w-6 h-6 rounded-full border flex items-center justify-center transition-all ${isSelected ? 'bg-indigo-500 border-indigo-500' : 'border-slate-700'
+                                        <div className={`w-6 h-6 rounded-full border flex items-center justify-center transition-all ${isSelected ? 'bg-indigo-500 border-indigo-500' :
+                                                isAlreadyRunning ? 'bg-red-500/20 border-red-500/30' :
+                                                    'border-slate-700'
                                             }`}>
                                             {isSelected && <div className="w-2 h-2 bg-white rounded-full"></div>}
+                                            {isAlreadyRunning && <div className="w-2 h-2 bg-red-500 rounded-full"></div>}
                                         </div>
                                     </button>
                                 );
