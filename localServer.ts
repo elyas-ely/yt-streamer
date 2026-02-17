@@ -129,6 +129,7 @@ export function localServerPlugin(): Plugin {
                     }
 
                     const fileName = path.basename(key);
+                    console.log(`[LocalServer] Saving video: ${fileName} (Key: ${key})`);
                     const tempFilePath = path.join(publicDir, `temp_${Date.now()}_${fileName}`);
                     const finalFilePath = path.join(publicDir, fileName);
                     const writeStream = fs.createWriteStream(tempFilePath);

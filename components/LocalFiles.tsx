@@ -232,7 +232,7 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery, viewMode })
                                     </div>
                                     <div className="flex flex-col min-w-0">
                                         <h4 className={`text-sm font-black uppercase tracking-wider truncate transition-colors ${isCurrentlyStreaming ? 'text-red-400' : 'text-white'}`}>
-                                            {video.name.split('.')[0]}
+                                            {video.name.replace(/\.[^/.]+$/, "")}
                                         </h4>
                                         <div className="flex items-center gap-2">
                                             <span className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-2">
@@ -334,8 +334,8 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery, viewMode })
 
                                 <div className="px-0.5 md:px-1 flex justify-between items-start gap-1 md:gap-4">
                                     <div className="flex-1 min-w-0">
-                                        <h4 className={`text-[9px] md:text-[13px] font-black uppercase tracking-wider truncate mb-0 md:mb-2 transition-colors duration-300 ${isCurrentlyStreaming ? 'text-red-400' : 'text-white group-hover:text-indigo-300'}`}>
-                                            {video.name.split('.')[0]}
+                                        <h4 className={`text-px md:text-[13px] font-black uppercase tracking-wider truncate mb-0 md:mb-2 transition-colors duration-300 ${isCurrentlyStreaming ? 'text-red-400' : 'text-white group-hover:text-indigo-300'}`}>
+                                            {video.name.replace(/\.[^/.]+$/, "")}
                                         </h4>
                                         <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
                                             <div className="flex items-center gap-1 md:gap-2 text-slate-500">
