@@ -156,7 +156,7 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery, viewMode })
     }
 
     return (
-        <div className="relative">
+        <div className="relative ">
             {/* Tab Navigation */}
             <div className="flex gap-2 mb-8 bg-slate-900/60 p-1.5 rounded-3xl border border-slate-800/40 w-fit">
                 <button
@@ -291,7 +291,7 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery, viewMode })
                                     : 'border-slate-800/60 hover:bg-slate-800/60 hover:border-indigo-500/40 hover:shadow-[0_10px_30px_rgba(0,0,0,0.3)]'
                                     }`}
                             >
-                                <div className="aspect-video relative rounded-lg md:rounded-3xl overflow-hidden bg-slate-950 mb-1.5 md:mb-5 border border-white/5 group-hover:border-indigo-500/30 transition-colors duration-300 shadow-inner">
+                                <div className="aspect-video relative rounded-lg md:rounded-3xl  bg-slate-950 mb-1.5 md:mb-5 border border-white/5 group-hover:border-indigo-500/30 transition-colors duration-300 shadow-inner">
                                     <video
                                         src={video.path}
                                         className={`w-full h-full object-cover ${isCurrentlyStreaming ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}
@@ -322,7 +322,7 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery, viewMode })
                                             <span className="text-[7px] md:text-[10px] font-black text-indigo-400/90 uppercase tracking-[0.1em]">{formatSize(video.size)}</span>
                                             <span className="text-[5px] md:text-[8px] font-bold text-slate-500 uppercase tracking-tighter">{formattedDate}</span>
                                         </div>
-                                        <div className="flex gap-1 md:gap-2">
+                                        <div className="flex  gap-1 md:gap-2">
                                             <VideoMenu
                                                 onStartStream={() => handleStartStreamClick(video.name)}
                                                 onDelete={() => setVideoToDelete(video.name)}

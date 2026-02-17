@@ -272,7 +272,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
 
   return (
     <>
-      <div className="max-w-full overflow-hidden">
+      <div className="max-w-full overflow-hidden ">
         {viewMode === 'list' ? (
           <div className="flex flex-col gap-3 w-full">
             <div className="flex items-center px-4 py-2 text-slate-600 text-[10px] font-black uppercase tracking-[0.2em]">

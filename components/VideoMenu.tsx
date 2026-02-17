@@ -35,8 +35,8 @@ export const VideoMenu: React.FC<VideoMenuProps> = ({ onStartStream, onDelete, i
                     setIsOpen(!isOpen);
                 }}
                 className={`p-1.5 md:p-2 rounded-lg md:rounded-xl transition-all duration-300 ${isOpen
-                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
-                        : 'bg-slate-800/40 text-slate-400 hover:bg-slate-700/60 hover:text-white border border-slate-700/50'
+                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+                    : 'bg-slate-800/40 text-slate-400 hover:bg-slate-700/60 hover:text-white border border-slate-700/50'
                     }`}
             >
                 <IconMore className="w-4 h-4 md:w-5 md:h-5" />
@@ -69,8 +69,8 @@ export const VideoMenu: React.FC<VideoMenuProps> = ({ onStartStream, onDelete, i
                             }}
                             disabled={isStreaming}
                             className={`flex items-center gap-3 w-full px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors group ${isStreaming
-                                    ? 'text-slate-600 cursor-not-allowed'
-                                    : 'text-red-400 hover:bg-red-500/10'
+                                ? 'text-slate-600 cursor-not-allowed'
+                                : 'text-red-400 hover:bg-red-500/10'
                                 }`}
                         >
                             <IconTrash className={`w-4 h-4 ${!isStreaming && 'group-hover:scale-110 transition-transform'}`} />
