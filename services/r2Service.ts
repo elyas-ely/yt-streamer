@@ -215,7 +215,7 @@ export const renameObject = async (oldKey: string, newKey: string): Promise<void
 
       const copyCommand = new CopyObjectCommand({
         Bucket: BUCKET_NAME,
-        CopySource: `${BUCKET_NAME}/${itemKey}`,
+        CopySource: `${BUCKET_NAME}/${encodeURIComponent(itemKey)}`,
         Key: targetKey
       });
       await s3Client.send(copyCommand);
@@ -229,7 +229,7 @@ export const renameObject = async (oldKey: string, newKey: string): Promise<void
   } else {
     const copyCommand = new CopyObjectCommand({
       Bucket: BUCKET_NAME,
-      CopySource: `${BUCKET_NAME}/${oldKey}`,
+      CopySource: `${BUCKET_NAME}/${encodeURIComponent(oldKey)}`,
       Key: newKey
     });
     await s3Client.send(copyCommand);
