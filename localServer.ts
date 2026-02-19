@@ -20,6 +20,7 @@ interface StreamState {
 }
 
 const activeStreams = new Map<string, StreamState>();
+const activeDownloads = new Map<string, { loaded: number, total: number }>();
 const MAX_LOG_LINES = 10;
 
 const appendLog = (streamKey: string, data: string) => {
@@ -34,10 +35,36 @@ const appendLog = (streamKey: string, data: string) => {
 };
 
 export function localServerPlugin(): Plugin {
+    let s3Client: S3Client | null = null;
+    let bucketName: string | null = null;
+
     const handleRequest = (server: any, req: any, res: any, next: any, isPreview = false) => {
         const publicDir = path.resolve(__dirname, isPreview ? 'dist' : 'public');
         const env = loadEnv(server.config.mode, '.', '');
         const ytKey = env['YT_KEY'];
+
+        if (!s3Client) {
+            const endpoint = env['R2_ENDPOINT'];
+            const accessKeyId = env['R2_ACCESS_KEY_ID'];
+            const secretAccessKey = env['R2_SECRET_ACCESS_KEY'];
+            bucketName = env['R2_BUCKET_NAME'];
+
+            if (endpoint && accessKeyId && secretAccessKey) {
+                console.log(`[LocalServer] Initializing S3 Client for R2 (Bucket: ${bucketName})`);
+                s3Client = new S3Client({
+                    region: "auto",
+                    endpoint,
+                    credentials: {
+                        accessKeyId,
+                        secretAccessKey,
+                    },
+                    forcePathStyle: true,
+                    maxAttempts: 10,
+                });
+            } else {
+                console.warn('[LocalServer] R2 configuration missing in environment variables');
+            }
+        }
 
         if (!req.url) return next();
 
@@ -106,17 +133,11 @@ export function localServerPlugin(): Plugin {
                         return;
                     }
 
-                    const s3Client = new S3Client({
-                        region: "auto",
-                        endpoint: server.config.define?.['process.env.R2_ENDPOINT']?.replace(/\"/g, '') || process.env.R2_ENDPOINT,
-                        credentials: {
-                            accessKeyId: server.config.define?.['process.env.R2_ACCESS_KEY_ID']?.replace(/\"/g, '') || process.env.R2_ACCESS_KEY_ID!,
-                            secretAccessKey: server.config.define?.['process.env.R2_SECRET_ACCESS_KEY']?.replace(/\"/g, '') || process.env.R2_SECRET_ACCESS_KEY!,
-                        },
-                        forcePathStyle: true,
-                    });
-
-                    const bucketName = server.config.define?.['process.env.R2_BUCKET_NAME']?.replace(/\"/g, '') || process.env.R2_BUCKET_NAME;
+                    if (!s3Client || !bucketName) {
+                        res.statusCode = 500;
+                        res.end(JSON.stringify({ error: 'S3 Client not initialized. Check R2 credentials.' }));
+                        return;
+                    }
 
                     const command = new GetObjectCommand({
                         Bucket: bucketName,
@@ -135,11 +156,24 @@ export function localServerPlugin(): Plugin {
                     const writeStream = fs.createWriteStream(tempFilePath);
 
                     if (response.Body) {
+                        const total = parseInt(response.ContentLength?.toString() || '0');
+                        activeDownloads.set(key, { loaded: 0, total });
+
                         // @ts-ignore
-                        response.Body.pipe(writeStream);
+                        const body = response.Body as any;
+                        let loaded = 0;
+
+                        body.on('data', (chunk: any) => {
+                            loaded += chunk.length;
+                            activeDownloads.set(key, { loaded, total });
+                        });
+
+                        // @ts-ignore
+                        body.pipe(writeStream);
 
                         writeStream.on('finish', async () => {
                             writeStream.close();
+                            activeDownloads.delete(key);
                             const ffmpegArgs = ['-y', '-i', tempFilePath, '-c', 'copy', '-map_metadata', '0', '-movflags', '+faststart', finalFilePath];
                             const optimizeProcess = spawn('ffmpeg', ffmpegArgs);
 
@@ -327,6 +361,23 @@ export function localServerPlugin(): Plugin {
 
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify({ streams }));
+            return;
+        }
+
+        // API to get download progress
+        if (req.url.startsWith('/api/local/download/status') && req.method === 'GET') {
+            const url = new URL(req.url, `http://${req.headers.host}`);
+            const key = url.searchParams.get('key');
+
+            if (!key) {
+                res.statusCode = 400;
+                res.end(JSON.stringify({ error: 'key is required' }));
+                return;
+            }
+
+            const progress = activeDownloads.get(key) || { loaded: 0, total: 0 };
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify(progress));
             return;
         }
 

@@ -9,7 +9,7 @@ import { RenameModal } from './components/RenameModal';
 import { UploadManager } from './components/UploadManager';
 import { DownloadManager } from './components/DownloadManager';
 import { LocalFiles } from './components/LocalFiles';
-import { saveToLocal } from './services/localService';
+import { saveToLocal, getDownloadProgress } from './services/localService';
 import {
   getBuckets,
   listObjects,
@@ -314,15 +314,64 @@ const App: React.FC = () => {
   };
 
   const handleSaveToLocal = async (key: string) => {
-    setIsLoading(true);
-    setSyncStatus('Saving to /public folder...');
+    const obj = objects.find(o => o.key === key);
+    const name = key.split('/').pop() || 'download';
+    const taskId = Math.random().toString(36).substring(7);
+
+    const newTask: DownloadTask = {
+      id: taskId,
+      name: `[SERVER] ${name}`,
+      key,
+      progress: 0,
+      status: 'pending',
+      loaded: 0,
+      total: obj?.size || 0,
+      startTime: Date.now()
+    };
+
+    setDownloadTasks(prev => [...prev, newTask]);
+
+    // Polling for progress
+    const pollInterval = setInterval(async () => {
+      try {
+        const progress = await getDownloadProgress(key);
+        if (progress.total > 0) {
+          setDownloadTasks(prev => prev.map(t => {
+            if (t.id !== taskId) return t;
+
+            const percent = (progress.loaded / progress.total) * 100;
+            const now = Date.now();
+            const elapsed = (now - (t.startTime || now)) / 1000;
+            const speed = progress.loaded / Math.max(0.1, elapsed);
+            const remainingBytes = progress.total - progress.loaded;
+            const estimatedTimeRemaining = speed > 0 ? remainingBytes / speed : 0;
+
+            return {
+              ...t,
+              status: 'downloading',
+              loaded: progress.loaded,
+              total: progress.total,
+              progress: percent,
+              estimatedTimeRemaining
+            };
+          }));
+        }
+      } catch (e) {
+        console.warn("Progress polling error", e);
+      }
+    }, 1000);
+
     try {
       const result = await saveToLocal(key);
-      alert(`${result.message}: ${result.fileName}`);
+      clearInterval(pollInterval);
+      setDownloadTasks(prev => prev.map(t =>
+        t.id === taskId ? { ...t, status: 'completed', progress: 100, loaded: t.total } : t
+      ));
     } catch (err: any) {
-      alert(`Failed to save to local: ${err.message}`);
-    } finally {
-      setIsLoading(false);
+      clearInterval(pollInterval);
+      setDownloadTasks(prev => prev.map(t =>
+        t.id === taskId ? { ...t, status: 'failed', error: err.message } : t
+      ));
     }
   };
 

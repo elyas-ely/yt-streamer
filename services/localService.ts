@@ -148,3 +148,10 @@ export const stopAllStreams = async (): Promise<{ message: string }> => {
 
     return response.json();
 };
+export const getDownloadProgress = async (key: string): Promise<{ loaded: number; total: number }> => {
+    const response = await fetch(`/api/local/download/status?key=${encodeURIComponent(key)}`);
+    if (!response.ok) {
+        throw new Error('Failed to fetch download progress');
+    }
+    return response.json();
+};
