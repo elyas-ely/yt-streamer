@@ -36,6 +36,7 @@ interface TopBarProps {
   onClearSelection?: () => void;
   totalCount: number;
   downloadTasks: DownloadTask[];
+  onCleanStaleUploads?: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -56,7 +57,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   onSelectAll,
   onClearSelection,
   totalCount,
-  downloadTasks
+  downloadTasks,
+  onCleanStaleUploads
 }) => {
   const [isAddingFolder, setIsAddingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
@@ -247,6 +249,17 @@ export const TopBar: React.FC<TopBarProps> = ({
                 {allSelected && <div className="w-2 h-2 bg-indigo-600 rounded-sm"></div>}
               </div>
               <span className="hidden md:inline">{allSelected ? 'Deselect' : 'Select'} All</span>
+            </button>
+
+            <div className="w-px h-4 bg-slate-700 mx-1"></div>
+
+            <button
+              onClick={onCleanStaleUploads}
+              title="Clean Stale Multipart Uploads from R2"
+              className="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-indigo-400 hover:bg-indigo-500/5 transition-all flex items-center gap-2"
+            >
+              <IconRefresh className="w-3.5 h-3.5" />
+              <span className="hidden lg:inline">Clean R2</span>
             </button>
 
             <div className="w-px h-4 bg-slate-700 mx-1"></div>

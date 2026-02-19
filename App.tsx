@@ -19,7 +19,8 @@ import {
   downloadObject,
   renameObject,
   getBucketStats,
-  listAllRecursive
+  listAllRecursive,
+  listAndAbortAllMultipartUploads
 } from './services/r2Service';
 import { Bucket, R2Object, ViewMode, UploadTask, DownloadTask } from './types';
 
@@ -430,6 +431,21 @@ const App: React.FC = () => {
     setSelectedKeys([]);
   }, []);
 
+  const handleCleanStaleUploads = async () => {
+    setIsLoading(true);
+    setSyncStatus('Cleaning R2...');
+    try {
+      const count = await listAndAbortAllMultipartUploads();
+      alert(`Successfully aborted ${count} stale multipart uploads.`);
+      await fetchObjects();
+      await refreshStorageStats();
+    } catch (err: any) {
+      alert(`Cleanup failed: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="flex h-screen bg-slate-950 text-slate-200 overflow-hidden relative">
       {connectionError === 'CORS_ERROR' && <CORSHelp onRetry={fetchObjects} />}
@@ -488,6 +504,7 @@ const App: React.FC = () => {
           onDownloadSelected={handleDownloadSelected}
           onSelectAll={handleSelectAll}
           onClearSelection={handleClearSelection}
+          onCleanStaleUploads={handleCleanStaleUploads}
           totalCount={filteredObjects.length}
         />
 

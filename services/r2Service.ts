@@ -171,35 +171,100 @@ export const createFolder = async (path: string): Promise<void> => {
  */
 const abortMultipartUploadsForKey = async (key: string): Promise<void> => {
   try {
-    const listCommand = new ListMultipartUploadsCommand({
-      Bucket: BUCKET_NAME,
-      Prefix: key
-    });
+    let keyMarker: string | undefined = undefined;
+    let uploadIdMarker: string | undefined = undefined;
+    let isTruncated = true;
+    let abortCount = 0;
 
-    const response = await s3Client.send(listCommand);
+    while (isTruncated) {
+      const listCommand = new ListMultipartUploadsCommand({
+        Bucket: BUCKET_NAME,
+        Prefix: key,
+        KeyMarker: keyMarker,
+        UploadIdMarker: uploadIdMarker
+      });
 
-    if (response.Uploads) {
-      // Find uploads specifically for this key
-      const relevantUploads = response.Uploads.filter(upload => upload.Key === key);
+      const response = await s3Client.send(listCommand);
 
-      for (const upload of relevantUploads) {
-        if (upload.UploadId) {
-          console.log(`[R2 Upload] Aborting stale multipart upload for ${key} (ID: ${upload.UploadId})`);
-          const abortCommand = new AbortMultipartUploadCommand({
-            Bucket: BUCKET_NAME,
-            Key: key,
-            UploadId: upload.UploadId
-          });
-          await s3Client.send(abortCommand).catch(err => {
-            console.warn(`[R2 Upload] Failed to abort upload ID ${upload.UploadId}:`, err);
-          });
+      if (response.Uploads) {
+        // Find uploads specifically for this key
+        const relevantUploads = response.Uploads.filter(upload => upload.Key === key);
+
+        for (const upload of relevantUploads) {
+          if (upload.UploadId) {
+            console.log(`[R2 Upload] Aborting stale multipart upload for ${key} (ID: ${upload.UploadId})`);
+            const abortCommand = new AbortMultipartUploadCommand({
+              Bucket: BUCKET_NAME,
+              Key: key,
+              UploadId: upload.UploadId
+            });
+            await s3Client.send(abortCommand).catch(err => {
+              console.warn(`[R2 Upload] Failed to abort upload ID ${upload.UploadId}:`, err);
+            });
+            abortCount++;
+          }
         }
       }
+
+      isTruncated = response.IsTruncated || false;
+      keyMarker = response.NextKeyMarker;
+      uploadIdMarker = response.NextUploadIdMarker;
+    }
+
+    if (abortCount > 0) {
+      console.log(`[R2 Upload] Finished cleaning up ${abortCount} stale uploads for ${key}`);
     }
   } catch (error) {
-    // If the bucket doesn't support multipart listing or other issues, just log it
     console.warn(`[R2 Upload] Error checking for stale multipart uploads for ${key}:`, error);
   }
+};
+
+/**
+ * Lists and aborts ALL multi-part uploads in the bucket.
+ * Use with caution.
+ */
+export const listAndAbortAllMultipartUploads = async (): Promise<number> => {
+  let totalAborted = 0;
+  try {
+    let keyMarker: string | undefined = undefined;
+    let uploadIdMarker: string | undefined = undefined;
+    let isTruncated = true;
+
+    while (isTruncated) {
+      const listCommand = new ListMultipartUploadsCommand({
+        Bucket: BUCKET_NAME,
+        KeyMarker: keyMarker,
+        UploadIdMarker: uploadIdMarker
+      });
+
+      const response = await s3Client.send(listCommand);
+
+      if (response.Uploads) {
+        for (const upload of response.Uploads) {
+          if (upload.UploadId && upload.Key) {
+            console.log(`[R2 Cleanup] Aborting upload for ${upload.Key} (ID: ${upload.UploadId})`);
+            const abortCommand = new AbortMultipartUploadCommand({
+              Bucket: BUCKET_NAME,
+              Key: upload.Key,
+              UploadId: upload.UploadId
+            });
+            await s3Client.send(abortCommand).catch(err => {
+              console.warn(`[R2 Cleanup] Failed to abort ${upload.Key}:`, err);
+            });
+            totalAborted++;
+          }
+        }
+      }
+
+      isTruncated = response.IsTruncated || false;
+      keyMarker = response.NextKeyMarker;
+      uploadIdMarker = response.NextUploadIdMarker;
+    }
+  } catch (error) {
+    console.error(`[R2 Cleanup] Error during global abort:`, error);
+    throw error;
+  }
+  return totalAborted;
 };
 
 export const uploadFileWithProgress = async (
@@ -208,6 +273,7 @@ export const uploadFileWithProgress = async (
   onProgress: (loaded: number) => void
 ): Promise<void> => {
   const key = `${path}${file.name}`;
+  let parallelUploads3: Upload | null = null;
 
   try {
     console.log(`[R2 Upload] Starting upload for ${file.name} to ${key}`);
@@ -215,7 +281,7 @@ export const uploadFileWithProgress = async (
     // Clean up any stale uploads for this key before starting
     await abortMultipartUploadsForKey(key);
 
-    const parallelUploads3 = new Upload({
+    parallelUploads3 = new Upload({
       client: s3Client,
       params: {
         Bucket: BUCKET_NAME,
@@ -240,6 +306,15 @@ export const uploadFileWithProgress = async (
     console.log(`[R2 Upload] Finished upload for ${file.name}:`, result);
   } catch (error: any) {
     console.error(`Upload error for ${file.name}:`, error);
+    // Be very explicit here - if it fails, try to abort to avoid "Ongoing Multipart Upload" state
+    try {
+      if (parallelUploads3 && typeof (parallelUploads3 as any).abort === 'function') {
+        await (parallelUploads3 as any).abort();
+        console.log(`[R2 Upload] Succesfully aborted failed upload for ${file.name}`);
+      }
+    } catch (abortErr) {
+      console.warn(`[R2 Upload] Secondary abort effort failed:`, abortErr);
+    }
     throw error;
   }
 };
