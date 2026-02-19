@@ -1,28 +1,11 @@
+import { StreamChannel, StreamStatus, StreamingPlatform } from '../types';
+export type { StreamChannel, StreamStatus, StreamingPlatform };
 
 export interface LocalVideo {
     name: string;
     size: number;
     lastModified: string;
     path: string;
-}
-
-export interface YouTubeChannel {
-    id: number;
-    title: string;
-    channel: string;
-    streamKey: string;
-    emoji?: string;
-}
-
-export interface ActiveStream {
-    streamKey: string;
-    fileName: string;
-    title: string;
-    channel: string;
-    emoji?: string;
-    startTime: number;
-    loop: boolean;
-    isStreaming: boolean;
 }
 
 export const getLocalVideos = async (): Promise<LocalVideo[]> => {
@@ -33,10 +16,10 @@ export const getLocalVideos = async (): Promise<LocalVideo[]> => {
     return response.json();
 };
 
-export const getYouTubeChannels = async (): Promise<YouTubeChannel[]> => {
-    const response = await fetch('/api/local/youtube-channels');
+export const getPlatforms = async (): Promise<StreamingPlatform[]> => {
+    const response = await fetch('/api/local/platforms');
     if (!response.ok) {
-        throw new Error('Failed to fetch YouTube channels');
+        throw new Error('Failed to fetch platforms');
     }
     return response.json();
 };
@@ -70,7 +53,8 @@ export const startStream = async (params: {
     title: string;
     channel: string;
     emoji?: string;
-    loop: boolean
+    loop: boolean;
+    rtmpUrl: string;
 }): Promise<{ message: string; fileName: string }> => {
     const response = await fetch('/api/local/stream/start', {
         method: 'POST',
@@ -105,7 +89,7 @@ export const stopStream = async (streamKey: string): Promise<{ message: string }
     return response.json();
 };
 
-export const getStreamStatus = async (): Promise<{ streams: ActiveStream[] }> => {
+export const getStreamStatus = async (): Promise<{ streams: StreamStatus[] }> => {
     const response = await fetch('/api/local/stream/status');
     if (!response.ok) {
         throw new Error('Failed to fetch stream status');

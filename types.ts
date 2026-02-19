@@ -50,3 +50,30 @@ export interface DownloadTask {
   loaded: number;
   total: number;
 }
+
+export interface StreamChannel {
+  id: number;
+  title: string;
+  channel: string;
+  streamKey: string;
+  emoji: string;
+}
+
+export interface StreamingPlatform {
+  id: string;
+  name: string;
+  icon: string;
+  rtmpUrl: string;
+  channels: StreamChannel[];
+}
+
+export interface StreamStatus {
+  streamKey: string;
+  fileName: string;
+  title: string;
+  channel: string;
+  emoji: string;
+  startTime: number;
+  loop: boolean;
+  isStreaming: boolean;
+}

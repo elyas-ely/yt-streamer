@@ -138,3 +138,21 @@ export const IconClose = ({ className = "w-5 h-5" }) => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
   </svg>
 );
+
+export const IconYoutube = ({ className = "w-5 h-5" }) => (
+  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+  </svg>
+);
+
+export const IconTwitch = ({ className = "w-5 h-5" }) => (
+  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+    <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z" />
+  </svg>
+);
+
+export const IconRumble = ({ className = "w-5 h-5" }) => (
+  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+    <path d="M22.38 10.98a4.912 4.912 0 0 1-.95 6.46l-4.71 4.14a4.912 4.912 0 0 1-6.17.65 4.912 4.912 0 0 1-2.22-6.14l1.24-4.82a4.912 4.912 0 0 1-.65-6.17l4.14-4.71a4.912 4.912 0 0 1 6.46-.95l.01.01a4.912 4.912 0 0 1 .65 6.17l-1.24 4.82a4.912 4.912 0 0 1-.03 2.15l1.62.01a4.912 4.912 0 0 1 1.8.36zM11.5 5.5l-2 3.5 3.5-1.5z" />
+  </svg>
+);

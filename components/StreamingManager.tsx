@@ -1,10 +1,10 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { ActiveStream, getStreamStatus, stopStream, getStreamLogs, stopAllStreams } from '../services/localService';
+import { StreamStatus, getStreamStatus, stopStream, getStreamLogs, stopAllStreams } from '../services/localService';
 import { IconClose, IconVideo, IconRefresh, IconSearch } from './Icons';
 
 export const StreamingManager: React.FC = () => {
-    const [activeStreams, setActiveStreams] = useState<ActiveStream[]>([]);
+    const [activeStreams, setActiveStreams] = useState<StreamStatus[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedStreamKey, setSelectedStreamKey] = useState<string | null>(null);
     const [logs, setLogs] = useState<string[]>([]);

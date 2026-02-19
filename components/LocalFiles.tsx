@@ -5,18 +5,17 @@ import {
     LocalVideo,
     getStreamStatus,
     startStream,
-    getYouTubeChannels,
-    YouTubeChannel,
-    ActiveStream,
+    getPlatforms,
     deleteLocalVideo
 } from '../services/localService';
 import { IconGrid, IconSearch, IconStorage, IconRefresh, IconClose, IconVideo, IconTrash } from './Icons';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
+import { PlatformSelectorModal } from './PlatformSelectorModal';
 import { ChannelSelectorModal } from './ChannelSelectorModal';
 import { StreamingManager } from './StreamingManager';
 import { VideoMenu } from './VideoMenu';
 
-import { ViewMode } from '../types';
+import { ViewMode, StreamChannel, StreamStatus, StreamingPlatform } from '../types';
 
 interface LocalFilesProps {
     searchQuery: string;
@@ -37,13 +36,15 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery, viewMode })
     const [videos, setVideos] = useState<LocalVideo[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [activeStreams, setActiveStreams] = useState<ActiveStream[]>([]);
-    const [channels, setChannels] = useState<YouTubeChannel[]>([]);
+    const [activeStreams, setActiveStreams] = useState<StreamStatus[]>([]);
+    const [platforms, setPlatforms] = useState<StreamingPlatform[]>([]);
     const [isLooping, setIsLooping] = useState(true);
     const [activeTab, setActiveTab] = useState<ActiveTab>('files');
 
-    // Channel selection state
+    // Platform and Channel selection state
+    const [showPlatformSelector, setShowPlatformSelector] = useState(false);
     const [showChannelSelector, setShowChannelSelector] = useState(false);
+    const [selectedPlatform, setSelectedPlatform] = useState<StreamingPlatform | null>(null);
     const [videoToStream, setVideoToStream] = useState<string | null>(null);
 
     const [isDeleting, setIsDeleting] = useState(false);
@@ -69,34 +70,40 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery, viewMode })
         }
     }, []);
 
-    const fetchChannels = useCallback(async () => {
+    const fetchPlatforms = useCallback(async () => {
         try {
-            const data = await getYouTubeChannels();
-            setChannels(data);
+            const data = await getPlatforms();
+            setPlatforms(data);
         } catch (err) {
-            console.error("Failed to fetch channels", err);
+            console.error("Failed to fetch platforms", err);
         }
     }, []);
 
     useEffect(() => {
         fetchVideos();
         fetchStreamStatus();
-        fetchChannels();
+        fetchPlatforms();
 
         const statusInterval = setInterval(() => {
             fetchStreamStatus();
         }, 5000);
 
         return () => clearInterval(statusInterval);
-    }, [fetchVideos, fetchStreamStatus, fetchChannels]);
+    }, [fetchVideos, fetchStreamStatus, fetchPlatforms]);
 
     const handleStartStreamClick = (fileName: string) => {
         setVideoToStream(fileName);
+        setShowPlatformSelector(true);
+    };
+
+    const handlePlatformSelect = (platform: StreamingPlatform) => {
+        setSelectedPlatform(platform);
+        setShowPlatformSelector(false);
         setShowChannelSelector(true);
     };
 
-    const handleChannelSelect = async (selectedChannels: YouTubeChannel[]) => {
-        if (!videoToStream) return;
+    const handleChannelSelect = async (selectedChannels: StreamChannel[]) => {
+        if (!videoToStream || !selectedPlatform) return;
 
         try {
             const promises = selectedChannels.map(channel =>
@@ -106,7 +113,8 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery, viewMode })
                     title: channel.title,
                     channel: channel.channel,
                     emoji: channel.emoji || '🔴',
-                    loop: isLooping
+                    loop: isLooping,
+                    rtmpUrl: selectedPlatform.rtmpUrl
                 })
             );
 
@@ -114,6 +122,7 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery, viewMode })
 
             setShowChannelSelector(false);
             setVideoToStream(null);
+            setSelectedPlatform(null);
             fetchStreamStatus();
             setActiveTab('streaming');
         } catch (err: any) {
@@ -359,16 +368,34 @@ export const LocalFiles: React.FC<LocalFilesProps> = ({ searchQuery, viewMode })
                 </div>
             )}
 
+            <PlatformSelectorModal
+                isOpen={showPlatformSelector}
+                onClose={() => {
+                    setShowPlatformSelector(false);
+                    setVideoToStream(null);
+                }}
+                onSelect={handlePlatformSelect}
+                platforms={platforms}
+                fileName={videoToStream || ''}
+            />
+
             <ChannelSelectorModal
                 isOpen={showChannelSelector}
                 onClose={() => {
                     setShowChannelSelector(false);
                     setVideoToStream(null);
+                    setSelectedPlatform(null);
+                }}
+                onBack={() => {
+                    setShowChannelSelector(false);
+                    setShowPlatformSelector(true);
                 }}
                 onSelect={handleChannelSelect}
-                channels={channels}
+                channels={selectedPlatform?.channels || []}
                 activeStreams={activeStreams}
                 fileName={videoToStream || ''}
+                platformName={selectedPlatform?.name || ''}
+                platformId={selectedPlatform?.id || ''}
             />
 
             <DeleteConfirmModal

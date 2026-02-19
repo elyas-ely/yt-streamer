@@ -1,0 +1,77 @@
+{
+    "platforms": [
+        {
+            "id": "youtube",
+            "name": "YouTube",
+            "icon": "youtube",
+            "rtmpUrl": "rtmp://a.rtmp.youtube.com/live2/",
+            "channels": [
+                {
+                    "id": 1,
+                    "title": "part 10",
+                    "channel": "Fun UniverseASMR",
+                    "streamKey": "bgpw-th3f-5xwf-ke5s-73v0",
+                    "emoji": "🐠"
+                },
+                {
+                    "id": 2,
+                    "title": "flag wars 2026",
+                    "channel": "SuperMM",
+                    "streamKey": "c1jq-q1b0-4fgr-k4k3-4yg8",
+                    "emoji": "🌆"
+                },
+                {
+                    "id": 3,
+                    "title": "part 2",
+                    "channel": "cutties and paws",
+                    "streamKey": "897j-7w53-qgvb-uxvg-ba15",
+                    "emoji": "🐶"
+                },
+                {
+                    "id": 4,
+                    "title": "Learn country flags",
+                    "channel": "Fast test",
+                    "streamKey": "p5rx-1wa1-kc0j-ajkb-5kag",
+                    "emoji": "💝"
+                }
+            ]
+        },
+        {
+            "id": "twitch",
+            "name": "Twitch",
+            "icon": "twitch",
+            "rtmpUrl": "rtmp://live.twitch.tv/app/",
+            "channels": [
+                {
+                    "id": 101,
+                    "title": "Gamer Live 01",
+                    "channel": "TwitchGamer",
+                    "streamKey": "live_12345678_abcd",
+                    "emoji": "🎮"
+                },
+                {
+                    "id": 102,
+                    "title": "IRL Adventures",
+                    "channel": "VlogStar",
+                    "streamKey": "live_87654321_dcba",
+                    "emoji": "🤳"
+                }
+            ]
+        },
+        {
+            "id": "rumble",
+            "name": "Rumble",
+            "icon": "rumble",
+            "rtmpUrl": "rtmps://stream-matrix.rumble.com:443/live/",
+            "channels": [
+                {
+                    "id": 201,
+                    "title": "Viral Buzz",
+                    "channel": "ViralKing",
+                    "streamKey": "key-rumble-v-001",
+                    "emoji": "🔥"
+                }
+            ]
+        }
+    ]
+}

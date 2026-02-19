@@ -68,14 +68,14 @@ export function localServerPlugin(): Plugin {
 
         if (!req.url) return next();
 
-        // API to list YouTube channels from youtube.json
-        if (req.url === '/api/local/youtube-channels' && req.method === 'GET') {
+        // API to list streaming platforms and channels from platforms.json
+        if (req.url === '/api/local/platforms' && req.method === 'GET') {
             try {
-                const configPath = path.resolve(__dirname, 'youtube.json');
+                const configPath = path.resolve(__dirname, 'platforms.json');
                 if (fs.existsSync(configPath)) {
                     const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
                     res.setHeader('Content-Type', 'application/json');
-                    res.end(JSON.stringify(config.streams || []));
+                    res.end(JSON.stringify(config.platforms || []));
                 } else {
                     res.setHeader('Content-Type', 'application/json');
                     res.end(JSON.stringify([]));
@@ -226,10 +226,10 @@ export function localServerPlugin(): Plugin {
 
             req.on('end', async () => {
                 try {
-                    const { fileName, streamKey, title, channel, emoji, loop } = JSON.parse(body);
-                    if (!fileName || !streamKey) {
+                    const { fileName, streamKey, title, channel, emoji, loop, rtmpUrl: platformRtmpUrl } = JSON.parse(body);
+                    if (!fileName || !streamKey || !platformRtmpUrl) {
                         res.statusCode = 400;
-                        res.end(JSON.stringify({ error: 'fileName and streamKey are required' }));
+                        res.end(JSON.stringify({ error: 'fileName, streamKey, and rtmpUrl are required' }));
                         return;
                     }
 
@@ -246,7 +246,7 @@ export function localServerPlugin(): Plugin {
                         return;
                     }
 
-                    const rtmpUrl = `rtmp://a.rtmp.youtube.com/live2/${streamKey}`;
+                    const rtmpUrl = `${platformRtmpUrl}${streamKey}`;
 
                     const ffmpegArgs = [];
                     if (loop) {

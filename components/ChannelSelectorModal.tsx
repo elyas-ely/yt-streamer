@@ -1,24 +1,39 @@
-
 import React, { useState, useEffect } from 'react';
-import { YouTubeChannel, ActiveStream } from '../services/localService';
-import { IconClose, IconVideo } from './Icons';
+import { StreamChannel, StreamStatus } from '../types';
+import { IconClose, IconVideo, IconYoutube, IconTwitch, IconRumble, IconArrowLeft } from './Icons';
 
 interface ChannelSelectorModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSelect: (channels: YouTubeChannel[]) => void;
-    channels: YouTubeChannel[];
-    activeStreams: ActiveStream[];
+    onBack: () => void;
+    onSelect: (channels: StreamChannel[]) => void;
+    channels: StreamChannel[];
+    activeStreams: StreamStatus[];
     fileName: string;
+    platformName: string;
+    platformId: string;
 }
+
+const getPlatformIcon = (id: string, isSelected: boolean) => {
+    const className = `w-6 h-6 ${isSelected ? 'text-white' : 'text-indigo-400'}`;
+    switch (id.toLowerCase()) {
+        case 'youtube': return <IconYoutube className={className} />;
+        case 'twitch': return <IconTwitch className={className} />;
+        case 'rumble': return <IconRumble className={className} />;
+        default: return <IconVideo className={className} />;
+    }
+};
 
 export const ChannelSelectorModal: React.FC<ChannelSelectorModalProps> = ({
     isOpen,
     onClose,
+    onBack,
     onSelect,
     channels,
     activeStreams,
-    fileName
+    fileName,
+    platformName,
+    platformId
 }) => {
     const [selectedChannelIds, setSelectedChannelIds] = useState<Set<number>>(new Set());
 
@@ -62,9 +77,16 @@ export const ChannelSelectorModal: React.FC<ChannelSelectorModalProps> = ({
             <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={onClose} />
 
             <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-                <div className="flex items-center justify-between px-8 py-6 border-b border-slate-800/50">
-                    <div>
-                        <h3 className="text-xl font-black text-white uppercase tracking-tighter">Select Channels</h3>
+                <div className="flex items-center gap-6 px-8 py-6 border-b border-slate-800/50">
+                    <button
+                        onClick={onBack}
+                        className="p-2 hover:bg-slate-800 rounded-xl transition-colors text-slate-400 hover:text-white group"
+                        title="Go Back"
+                    >
+                        <IconArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+                    </button>
+                    <div className="flex-1">
+                        <h3 className="text-xl font-black text-white uppercase tracking-tighter">Select {platformName} Channels</h3>
                         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">
                             Streaming: <span className="text-indigo-400">{fileName}</span>
                         </p>
@@ -104,20 +126,20 @@ export const ChannelSelectorModal: React.FC<ChannelSelectorModalProps> = ({
                                         onClick={() => !isAlreadyRunning && toggleChannel(channel.id)}
                                         disabled={isAlreadyRunning}
                                         className={`group flex items-center gap-4 p-4 rounded-2xl transition-all text-left border ${isSelected
-                                                ? 'bg-indigo-600/20 border-indigo-500/50'
-                                                : isAlreadyRunning
-                                                    ? 'bg-red-500/5 border-red-500/20 opacity-80 cursor-not-allowed'
-                                                    : 'bg-slate-800/30 border-slate-800 hover:border-indigo-500/30'
+                                            ? 'bg-indigo-600/20 border-indigo-500/50'
+                                            : isAlreadyRunning
+                                                ? 'bg-red-500/5 border-red-500/20 opacity-80 cursor-not-allowed'
+                                                : 'bg-slate-800/30 border-slate-800 hover:border-indigo-500/30'
                                             }`}
                                     >
                                         <div className={`w-12 h-12 rounded-xl flex items-center justify-center border transition-colors ${isSelected ? 'bg-indigo-600 border-indigo-400' :
-                                                isAlreadyRunning ? 'bg-red-950/40 border-red-500/20' :
-                                                    'bg-slate-900 border-white/5'
+                                            isAlreadyRunning ? 'bg-red-950/40 border-red-500/20' :
+                                                'bg-slate-900 border-white/5'
                                             }`}>
                                             {channel.emoji ? (
                                                 <span className={`text-2xl ${isAlreadyRunning ? 'opacity-40 grayscale-[0.5]' : ''}`}>{channel.emoji}</span>
                                             ) : (
-                                                <IconVideo className={`w-6 h-6 ${isSelected ? 'text-white' : isAlreadyRunning ? 'text-red-500/40' : 'text-indigo-400'}`} />
+                                                getPlatformIcon(platformId, isSelected)
                                             )}
                                         </div>
                                         <div className="flex-1">
@@ -137,8 +159,8 @@ export const ChannelSelectorModal: React.FC<ChannelSelectorModalProps> = ({
                                             </p>
                                         </div>
                                         <div className={`w-6 h-6 rounded-full border flex items-center justify-center transition-all ${isSelected ? 'bg-indigo-500 border-indigo-500' :
-                                                isAlreadyRunning ? 'bg-red-500/20 border-red-500/30' :
-                                                    'border-slate-700'
+                                            isAlreadyRunning ? 'bg-red-500/20 border-red-500/30' :
+                                                'border-slate-700'
                                             }`}>
                                             {isSelected && <div className="w-2 h-2 bg-white rounded-full"></div>}
                                             {isAlreadyRunning && <div className="w-2 h-2 bg-red-500 rounded-full"></div>}
