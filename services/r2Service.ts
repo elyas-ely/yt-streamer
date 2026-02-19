@@ -8,6 +8,7 @@ import {
   CopyObjectCommand
 } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
+import { XhrHttpHandler } from "@aws-sdk/xhr-http-handler";
 import { R2Object, Bucket } from '../types';
 
 /**
@@ -26,7 +27,10 @@ const R2_CONFIG = {
 };
 
 const BUCKET_NAME = process.env.R2_BUCKET_NAME;
-const s3Client = new S3Client(R2_CONFIG);
+const s3Client = new S3Client({
+  ...R2_CONFIG,
+  requestHandler: new XhrHttpHandler({}),
+});
 
 export const getBucketStats = async (bucketName: string): Promise<{ storageUsed: number; objectCount: number }> => {
   let storageUsed = 0;
@@ -300,7 +304,7 @@ export const downloadObject = async (
   onProgress?: (loaded: number, total: number) => void
 ): Promise<void> => {
   const body = await getObjectBytes(key, onProgress);
-  const blob = new Blob([body]);
+  const blob = new Blob([body as unknown as BlobPart]);
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
