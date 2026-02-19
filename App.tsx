@@ -280,6 +280,7 @@ const App: React.FC = () => {
     try {
       const allKeys = await listAllRecursive(prefix);
       const fileKeys = allKeys.filter(key => !key.endsWith('/'));
+      console.log(`Found ${fileKeys.length} files in folder: ${prefix}`);
 
       const newTasks: DownloadTask[] = fileKeys.map(key => ({
         id: Math.random().toString(36).substring(7),

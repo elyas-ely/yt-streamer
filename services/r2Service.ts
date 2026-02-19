@@ -9,6 +9,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 import { XhrHttpHandler } from "@aws-sdk/xhr-http-handler";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { R2Object, Bucket } from '../types';
 
 /**
@@ -263,56 +264,61 @@ const getObjectBytes = async (
     Bucket: BUCKET_NAME,
     Key: key,
   });
-  const response = await s3Client.send(command);
 
-  if (!response.Body) throw new Error(`Empty response body for ${key}`);
+  // Generate a signed URL so we can use native XMLHttpRequest for granular progress
+  const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
 
-  const total = response.ContentLength || 0;
-  let loaded = 0;
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', url);
+    xhr.responseType = 'arraybuffer';
 
-  // Handle stream in browser environment
-  const reader = (response.Body as any).getReader ? (response.Body as any).getReader() : null;
+    xhr.onprogress = (event) => {
+      if (event.lengthComputable && onProgress) {
+        onProgress(event.loaded, event.total);
+      }
+    };
 
-  if (reader) {
-    const chunks: Uint8Array[] = [];
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      loaded += value.length;
-      if (onProgress) onProgress(loaded, total);
-    }
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(new Uint8Array(xhr.response));
+      } else {
+        reject(new Error(`Download failed with status ${xhr.status}`));
+      }
+    };
 
-    // Concatenate chunks
-    const result = new Uint8Array(loaded);
-    let offset = 0;
-    for (const chunk of chunks) {
-      result.set(chunk, offset);
-      offset += chunk.length;
-    }
-    return result;
-  } else {
-    // Fallback if reader is not available (shouldn't happen in modern browsers)
-    const body = await response.Body.transformToByteArray();
-    if (onProgress) onProgress(body.length, body.length);
-    return body;
-  }
+    xhr.onerror = () => {
+      console.error(`XHR Network Error for key: ${key}`, xhr);
+      reject(new Error('Network error during download'));
+    };
+
+    xhr.send();
+  });
 };
 
 export const downloadObject = async (
   key: string,
   onProgress?: (loaded: number, total: number) => void
 ): Promise<void> => {
-  const body = await getObjectBytes(key, onProgress);
-  const blob = new Blob([body as unknown as BlobPart]);
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = key.split('/').pop() || 'download';
-  document.body.appendChild(a);
-  a.click();
-  window.URL.revokeObjectURL(url);
-  document.body.removeChild(a);
+  try {
+    const body = await getObjectBytes(key, onProgress);
+    const blob = new Blob([body as unknown as BlobPart]);
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = key.split('/').pop() || 'download';
+    document.body.appendChild(a);
+    a.click();
+
+    // Delay revocation to ensure browser has time to start the download
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url);
+      if (a.parentNode) document.body.removeChild(a);
+    }, 10000);
+  } catch (error) {
+    console.error(`Error in downloadObject for ${key}:`, error);
+    throw error;
+  }
 };
 
 export const downloadFolder = async (prefix: string, onProgress?: (current: number, total: number) => void): Promise<void> => {
