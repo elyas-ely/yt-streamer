@@ -114,11 +114,13 @@ const App: React.FC = () => {
         ? `${currentPath}${task.webkitRelativePath.split('/').slice(0, -1).join('/')}/`.replace(/\/+/g, '/')
         : currentPath;
 
-      await uploadFileWithProgress(task.file, uploadPath, (loaded, total) => {
+      await uploadFileWithProgress(task.file, uploadPath, (loaded) => {
         setUploadTasks(prev => prev.map(t => {
           if (t.id !== task.id) return t;
 
-          const progress = (loaded / total) * 100;
+          // Always use the original file size for progress calculation to avoid jumps
+          const total = task.file.size;
+          const progress = total > 0 ? (loaded / total) * 100 : 0;
           const now = Date.now();
           const elapsed = (now - (t.startTime || now)) / 1000;
           const speed = loaded / Math.max(0.1, elapsed); // bytes per second
@@ -129,7 +131,6 @@ const App: React.FC = () => {
             ...t,
             progress,
             loaded,
-            total,
             estimatedTimeRemaining
           };
         }));
@@ -230,10 +231,12 @@ const App: React.FC = () => {
     setDownloadTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'downloading', startTime: Date.now() } : t));
 
     try {
-      await downloadObject(task.key, (loaded, total) => {
+      await downloadObject(task.key, (loaded) => {
         setDownloadTasks(prev => prev.map(t => {
           if (t.id !== task.id) return t;
 
+          // Use the pre-fetched total size to ensure progress bar stability
+          const total = t.total;
           const progress = total > 0 ? (loaded / total) * 100 : 0;
           const now = Date.now();
           const elapsed = (now - (t.startTime || now)) / 1000;
@@ -245,7 +248,6 @@ const App: React.FC = () => {
             ...t,
             progress,
             loaded,
-            total,
             estimatedTimeRemaining
           };
         }));
@@ -259,6 +261,7 @@ const App: React.FC = () => {
   }, []);
 
   const handleDownload = async (key: string) => {
+    const obj = objects.find(o => o.key === key);
     const name = key.split('/').pop() || 'download';
     const newTask: DownloadTask = {
       id: Math.random().toString(36).substring(7),
@@ -267,7 +270,7 @@ const App: React.FC = () => {
       progress: 0,
       status: 'pending',
       loaded: 0,
-      total: 0 // Will be updated during download start
+      total: obj?.size || 0
     };
 
     setDownloadTasks(prev => [...prev, newTask]);
@@ -426,6 +429,7 @@ const App: React.FC = () => {
           onCreateFolder={handleCreateFolderAction}
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           uploadTasks={uploadTasks}
+          downloadTasks={downloadTasks}
           isLoading={isLoading}
           selectedCount={selectedKeys.length}
           onDeleteSelected={() => setDeleteModal({ isOpen: true, keys: selectedKeys, isFolder: selectedKeys.some(k => k.endsWith('/')) })}

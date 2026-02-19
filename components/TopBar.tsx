@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import { ViewMode, UploadTask } from '../types';
+import { ViewMode, UploadTask, DownloadTask } from '../types';
 import {
   IconUpload,
   IconPlus,
@@ -35,6 +35,7 @@ interface TopBarProps {
   onSelectAll?: () => void;
   onClearSelection?: () => void;
   totalCount: number;
+  downloadTasks: DownloadTask[];
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -54,7 +55,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   onDownloadSelected,
   onSelectAll,
   onClearSelection,
-  totalCount
+  totalCount,
+  downloadTasks
 }) => {
   const [isAddingFolder, setIsAddingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
@@ -66,12 +68,22 @@ export const TopBar: React.FC<TopBarProps> = ({
     uploadTasks.filter(t => t.status === 'uploading' || t.status === 'pending'),
     [uploadTasks]);
 
+  const activeDownloads = useMemo(() =>
+    downloadTasks.filter(t => t.status === 'downloading' || t.status === 'pending'),
+    [downloadTasks]);
+
   const totalProgress = useMemo(() => {
-    if (activeUploads.length === 0) return 0;
-    const total = activeUploads.reduce((sum, t) => sum + t.total, 0);
-    const loaded = activeUploads.reduce((sum, t) => sum + t.loaded, 0);
+    const allTasks = [...uploadTasks, ...downloadTasks];
+    if (allTasks.length === 0) return 0;
+
+    // Only calculate progress if there is something currently active
+    const hasActive = activeUploads.length > 0 || activeDownloads.length > 0;
+    if (!hasActive) return 0;
+
+    const total = allTasks.reduce((sum, t) => sum + t.total, 0);
+    const loaded = allTasks.reduce((sum, t) => sum + t.loaded, 0);
     return total > 0 ? (loaded / total) * 100 : 0;
-  }, [activeUploads]);
+  }, [uploadTasks, downloadTasks, activeUploads.length, activeDownloads.length]);
 
   const handleCreateFolder = (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,11 +107,11 @@ export const TopBar: React.FC<TopBarProps> = ({
   return (
     <header className="bg-slate-900/80 backdrop-blur-md border-b border-slate-800/60 px-4 md:px-8 py-4 sticky top-0 z-30 transition-all overflow-hidden">
       {/* Global Progress -- Bar */}
-      {(activeUploads.length > 0 || isLoading) && (
+      {(activeUploads.length > 0 || activeDownloads.length > 0 || isLoading) && (
         <div className="absolute top-0 left-0 right-0 h-0.5 bg-indigo-500/10 z-50 overflow-hidden">
           <div
-            className={`h-full bg-indigo-500 transition-all duration-300 ease-out ${activeUploads.length === 0 ? 'animate-[loading_1.5s_infinite_ease-in-out]' : ''}`}
-            style={{ width: activeUploads.length > 0 ? `${totalProgress}%` : '30%' }}
+            className={`h-full bg-indigo-500 transition-all duration-300 ease-out ${(activeUploads.length === 0 && activeDownloads.length === 0) ? 'animate-[loading_1.5s_infinite_ease-in-out]' : ''}`}
+            style={{ width: (activeUploads.length > 0 || activeDownloads.length > 0) ? `${totalProgress}%` : '30%' }}
           ></div>
         </div>
       )}

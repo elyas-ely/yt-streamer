@@ -167,7 +167,7 @@ export const createFolder = async (path: string): Promise<void> => {
 export const uploadFileWithProgress = async (
   file: File,
   path: string,
-  onProgress: (loaded: number, total: number) => void
+  onProgress: (loaded: number) => void
 ): Promise<void> => {
   const key = `${path}${file.name}`;
 
@@ -186,8 +186,8 @@ export const uploadFileWithProgress = async (
     });
 
     parallelUploads3.on("httpUploadProgress", (progress) => {
-      if (progress.loaded !== undefined && progress.total !== undefined) {
-        onProgress(progress.loaded, progress.total);
+      if (progress.loaded !== undefined) {
+        onProgress(progress.loaded);
       }
     });
 
@@ -268,7 +268,7 @@ export const deleteObjects = async (keys: string[]): Promise<void> => {
  */
 const getObjectBytes = async (
   key: string,
-  onProgress?: (loaded: number, total: number) => void
+  onProgress?: (loaded: number) => void
 ): Promise<Uint8Array> => {
   const command = new GetObjectCommand({
     Bucket: BUCKET_NAME,
@@ -285,7 +285,7 @@ const getObjectBytes = async (
 
     xhr.onprogress = (event) => {
       if (event.lengthComputable && onProgress) {
-        onProgress(event.loaded, event.total);
+        onProgress(event.loaded);
       }
     };
 
@@ -308,7 +308,7 @@ const getObjectBytes = async (
 
 export const downloadObject = async (
   key: string,
-  onProgress?: (loaded: number, total: number) => void
+  onProgress?: (loaded: number) => void
 ): Promise<void> => {
   try {
     const body = await getObjectBytes(key, onProgress);
