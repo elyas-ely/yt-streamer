@@ -172,6 +172,7 @@ export const uploadFileWithProgress = async (
   const key = `${path}${file.name}`;
 
   try {
+    console.log(`[R2 Upload] Starting upload for ${file.name} to ${key}`);
     const parallelUploads3 = new Upload({
       client: s3Client,
       params: {
@@ -180,8 +181,11 @@ export const uploadFileWithProgress = async (
         Body: file,
         ContentType: file.type || 'application/octet-stream',
       },
-      partSize: 1024 * 1024 * 5,
-      queueSize: 2,
+      // Cloudflare R2 supports single PUT up to 5GB. 
+      // Using 100MB part size to ensure smaller videos are single-part
+      // and larger ones have manageable parts.
+      partSize: 1024 * 1024 * 100,
+      queueSize: 4,
       leavePartsOnError: false,
     });
 
@@ -191,7 +195,8 @@ export const uploadFileWithProgress = async (
       }
     });
 
-    await parallelUploads3.done();
+    const result = await parallelUploads3.done();
+    console.log(`[R2 Upload] Finished upload for ${file.name}:`, result);
   } catch (error: any) {
     console.error(`Upload error for ${file.name}:`, error);
     throw error;
