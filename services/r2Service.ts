@@ -5,7 +5,9 @@ import {
   PutObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
-  CopyObjectCommand
+  CopyObjectCommand,
+  ListMultipartUploadsCommand,
+  AbortMultipartUploadCommand
 } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 import { XhrHttpHandler } from "@aws-sdk/xhr-http-handler";
@@ -164,6 +166,42 @@ export const createFolder = async (path: string): Promise<void> => {
   await s3Client.send(command);
 };
 
+/**
+ * Aborts any pending multipart uploads for a specific key
+ */
+const abortMultipartUploadsForKey = async (key: string): Promise<void> => {
+  try {
+    const listCommand = new ListMultipartUploadsCommand({
+      Bucket: BUCKET_NAME,
+      Prefix: key
+    });
+
+    const response = await s3Client.send(listCommand);
+
+    if (response.Uploads) {
+      // Find uploads specifically for this key
+      const relevantUploads = response.Uploads.filter(upload => upload.Key === key);
+
+      for (const upload of relevantUploads) {
+        if (upload.UploadId) {
+          console.log(`[R2 Upload] Aborting stale multipart upload for ${key} (ID: ${upload.UploadId})`);
+          const abortCommand = new AbortMultipartUploadCommand({
+            Bucket: BUCKET_NAME,
+            Key: key,
+            UploadId: upload.UploadId
+          });
+          await s3Client.send(abortCommand).catch(err => {
+            console.warn(`[R2 Upload] Failed to abort upload ID ${upload.UploadId}:`, err);
+          });
+        }
+      }
+    }
+  } catch (error) {
+    // If the bucket doesn't support multipart listing or other issues, just log it
+    console.warn(`[R2 Upload] Error checking for stale multipart uploads for ${key}:`, error);
+  }
+};
+
 export const uploadFileWithProgress = async (
   file: File,
   path: string,
@@ -173,6 +211,10 @@ export const uploadFileWithProgress = async (
 
   try {
     console.log(`[R2 Upload] Starting upload for ${file.name} to ${key}`);
+
+    // Clean up any stale uploads for this key before starting
+    await abortMultipartUploadsForKey(key);
+
     const parallelUploads3 = new Upload({
       client: s3Client,
       params: {
@@ -182,10 +224,9 @@ export const uploadFileWithProgress = async (
         ContentType: file.type || 'application/octet-stream',
       },
       // Cloudflare R2 supports single PUT up to 5GB. 
-      // Using 100MB part size to ensure smaller videos are single-part
-      // and larger ones have manageable parts.
-      partSize: 1024 * 1024 * 100,
-      queueSize: 4,
+      // Using 20MB part size for better reliability and progress granularity
+      partSize: 1024 * 1024 * 20,
+      queueSize: 3,
       leavePartsOnError: false,
     });
 
