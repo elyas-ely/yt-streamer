@@ -46,10 +46,9 @@ const ProgressCircle = ({ progress, status }: { progress: number; status: string
           cy="24"
           r={radius}
           style={{ strokeDasharray: circumference, strokeDashoffset: offset }}
-          className={`fill-none transition-all duration-300 ease-out ${
-            status === 'failed' ? 'stroke-red-500' : 
-            status === 'completed' ? 'stroke-green-500' : 'stroke-indigo-500'
-          }`}
+          className={`fill-none transition-all duration-300 ease-out ${status === 'failed' ? 'stroke-red-500' :
+              status === 'completed' ? 'stroke-green-500' : 'stroke-indigo-500'
+            }`}
           strokeWidth="3"
           strokeLinecap="round"
         />
@@ -61,9 +60,9 @@ const ProgressCircle = ({ progress, status }: { progress: number; status: string
   );
 };
 
-export const UploadManager: React.FC<UploadManagerProps> = ({ 
-  tasks, 
-  onRetry, 
+export const UploadManager: React.FC<UploadManagerProps> = ({
+  tasks,
+  onRetry,
   onRemove,
   onClearCompleted,
   onClearAll
@@ -72,7 +71,7 @@ export const UploadManager: React.FC<UploadManagerProps> = ({
 
   const activeTasks = tasks.filter(t => t.status === 'uploading' || t.status === 'pending');
   const completedTasks = tasks.filter(t => t.status === 'completed');
-  
+
   const aggregateStats = useMemo(() => {
     const totalBytes = tasks.reduce((sum, t) => sum + t.total, 0);
     const loadedBytes = tasks.reduce((sum, t) => sum + t.loaded, 0);
@@ -86,7 +85,7 @@ export const UploadManager: React.FC<UploadManagerProps> = ({
     <div className="fixed bottom-6 right-6 z-[200] w-80 md:w-96 animate-in slide-in-from-right-4 duration-300">
       <div className="bg-slate-900/95 backdrop-blur-2xl border border-slate-700/50 rounded-[2rem] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col transition-all">
         {/* Header Summary */}
-        <div 
+        <div
           onClick={() => setIsExpanded(!isExpanded)}
           className="p-5 bg-gradient-to-br from-slate-800/80 to-slate-900/80 border-b border-slate-700/50 flex flex-col gap-3 cursor-pointer hover:from-slate-800 transition-all relative"
         >
@@ -99,7 +98,7 @@ export const UploadManager: React.FC<UploadManagerProps> = ({
             </div>
             <div className="flex items-center gap-3">
               <IconChevronRight className={`w-4 h-4 text-slate-400 transition-transform duration-500 ${isExpanded ? 'rotate-90' : ''}`} />
-              <button 
+              <button
                 onClick={(e) => {
                   e.stopPropagation();
                   onClearAll();
@@ -128,7 +127,7 @@ export const UploadManager: React.FC<UploadManagerProps> = ({
           </div>
 
           <div className="h-1.5 w-full bg-slate-950/50 rounded-full overflow-hidden">
-            <div 
+            <div
               className="h-full bg-indigo-500 shadow-[0_0_12px_rgba(99,102,241,0.6)] transition-all duration-500 ease-out"
               style={{ width: `${aggregateStats.progress}%` }}
             />
@@ -139,25 +138,27 @@ export const UploadManager: React.FC<UploadManagerProps> = ({
         {isExpanded && (
           <div className="max-h-96 overflow-y-auto custom-scrollbar p-3 space-y-2">
             {tasks.map((task) => (
-              <div 
+              <div
                 key={task.id}
                 className="bg-slate-950/40 border border-slate-800/50 rounded-2xl p-3 flex items-center gap-3 group hover:border-indigo-500/30 transition-all"
               >
-                <ProgressCircle progress={task.progress} status={task.status} />
-                
+                <div className="w-10 h-10 flex items-center justify-center bg-slate-800/50 rounded-xl shrink-0">
+                  <IconFile className="w-5 h-5 text-indigo-400" />
+                </div>
+
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-0.5">
                     <p className="text-xs font-bold text-slate-200 truncate pr-2">{task.file.name}</p>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       {task.status === 'failed' && (
-                        <button 
+                        <button
                           onClick={(e) => { e.stopPropagation(); onRetry(task.id); }}
                           className="p-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-lg transition-colors"
                         >
                           <IconRefresh className="w-3.5 h-3.5" />
                         </button>
                       )}
-                      <button 
+                      <button
                         onClick={(e) => { e.stopPropagation(); onRemove(task.id); }}
                         className="p-1.5 hover:bg-slate-800 text-slate-500 hover:text-white rounded-lg transition-colors"
                       >
@@ -165,9 +166,9 @@ export const UploadManager: React.FC<UploadManagerProps> = ({
                       </button>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-3 text-[10px] font-medium text-slate-500 uppercase tracking-tight">
-                    <span>{formatSize(task.total)}</span>
+                    <span>{formatSize(task.loaded)} / {formatSize(task.total)}</span>
                     {task.status === 'uploading' && task.estimatedTimeRemaining !== undefined && (
                       <span className="text-indigo-400 font-bold">{formatTime(task.estimatedTimeRemaining)} left</span>
                     )}
@@ -177,9 +178,9 @@ export const UploadManager: React.FC<UploadManagerProps> = ({
                 </div>
               </div>
             ))}
-            
+
             {completedTasks.length > 0 && activeTasks.length === 0 && (
-              <button 
+              <button
                 onClick={onClearCompleted}
                 className="w-full py-2.5 mt-2 bg-slate-800/50 hover:bg-slate-800 text-indigo-400 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all border border-slate-700/30"
               >

@@ -278,18 +278,18 @@ const App: React.FC = () => {
     setIsLoading(true);
     setSyncStatus('Preparing files...');
     try {
-      const allKeys = await listAllRecursive(prefix);
-      const fileKeys = allKeys.filter(key => !key.endsWith('/'));
-      console.log(`Found ${fileKeys.length} files in folder: ${prefix}`);
+      const allObjects = await listAllRecursive(prefix);
+      const files = allObjects.filter(obj => obj.type === 'file');
+      console.log(`Found ${files.length} files in folder: ${prefix}`);
 
-      const newTasks: DownloadTask[] = fileKeys.map(key => ({
+      const newTasks: DownloadTask[] = files.map(file => ({
         id: Math.random().toString(36).substring(7),
-        name: key.split('/').pop() || 'download',
-        key,
+        name: file.key.split('/').pop() || 'download',
+        key: file.key,
         progress: 0,
         status: 'pending',
         loaded: 0,
-        total: 0
+        total: file.size
       }));
 
       setDownloadTasks(prev => [...prev, ...newTasks]);
@@ -325,7 +325,7 @@ const App: React.FC = () => {
     setIsLoading(true);
     setSyncStatus('Preparing downloads...');
     try {
-      const keysToDownload: string[] = [];
+      const objsToDownload: R2Object[] = [];
 
       for (const key of selectedKeys) {
         const obj = objects.find(o => o.key === key);
@@ -333,20 +333,20 @@ const App: React.FC = () => {
 
         if (obj.type === 'folder') {
           const nested = await listAllRecursive(key);
-          nested.filter(nk => !nk.endsWith('/')).forEach(nk => keysToDownload.push(nk));
+          nested.filter(nk => nk.type === 'file').forEach(nk => objsToDownload.push(nk));
         } else {
-          keysToDownload.push(key);
+          objsToDownload.push(obj);
         }
       }
 
-      const newTasks: DownloadTask[] = keysToDownload.map(key => ({
+      const newTasks: DownloadTask[] = objsToDownload.map(obj => ({
         id: Math.random().toString(36).substring(7),
-        name: key.split('/').pop() || 'download',
-        key,
+        name: obj.key.split('/').pop() || 'download',
+        key: obj.key,
         progress: 0,
         status: 'pending',
         loaded: 0,
-        total: 0
+        total: obj.size
       }));
 
       setDownloadTasks(prev => [...prev, ...newTasks]);

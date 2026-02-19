@@ -46,7 +46,7 @@ const ProgressCircle = ({ progress, status }: { progress: number; status: string
                     r={radius}
                     style={{ strokeDasharray: circumference, strokeDashoffset: offset }}
                     className={`fill-none transition-all duration-300 ease-out ${status === 'failed' ? 'stroke-red-500' :
-                            status === 'completed' ? 'stroke-green-500' : 'stroke-indigo-500'
+                        status === 'completed' ? 'stroke-green-500' : 'stroke-indigo-500'
                         }`}
                     strokeWidth="3"
                     strokeLinecap="round"
@@ -140,7 +140,9 @@ export const DownloadManager: React.FC<DownloadManagerProps> = ({
                                 key={task.id}
                                 className="bg-slate-950/40 border border-slate-800/50 rounded-2xl p-3 flex items-center gap-3 group hover:border-indigo-500/30 transition-all"
                             >
-                                <ProgressCircle progress={task.progress} status={task.status} />
+                                <div className="w-10 h-10 flex items-center justify-center bg-slate-800/50 rounded-xl shrink-0">
+                                    <IconDownload className="w-5 h-5 text-indigo-400" />
+                                </div>
 
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between mb-0.5">
@@ -156,7 +158,7 @@ export const DownloadManager: React.FC<DownloadManagerProps> = ({
                                     </div>
 
                                     <div className="flex items-center gap-3 text-[10px] font-medium text-slate-500 uppercase tracking-tight">
-                                        <span>{formatSize(task.total)}</span>
+                                        <span>{formatSize(task.loaded)} / {formatSize(task.total)}</span>
                                         {task.status === 'downloading' && task.estimatedTimeRemaining !== undefined && (
                                             <span className="text-indigo-400 font-bold">{formatTime(task.estimatedTimeRemaining)} left</span>
                                         )}

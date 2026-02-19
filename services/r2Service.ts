@@ -73,8 +73,8 @@ export const getBuckets = async (): Promise<Bucket[]> => {
   }];
 };
 
-export const listAllRecursive = async (prefix: string): Promise<string[]> => {
-  let allKeys: string[] = [];
+export const listAllRecursive = async (prefix: string): Promise<R2Object[]> => {
+  let allObjects: R2Object[] = [];
   let continuationToken: string | undefined = undefined;
   try {
     do {
@@ -86,7 +86,16 @@ export const listAllRecursive = async (prefix: string): Promise<string[]> => {
       const response = await s3Client.send(command);
       if (response.Contents) {
         response.Contents.forEach(item => {
-          if (item.Key) allKeys.push(item.Key);
+          if (item.Key) {
+            allObjects.push({
+              key: item.Key,
+              size: item.Size || 0,
+              lastModified: item.LastModified || new Date(),
+              etag: item.ETag || '',
+              type: item.Key.endsWith('/') ? 'folder' : 'file',
+              mimeType: item.Key.split('.').pop()
+            });
+          }
         });
       }
       continuationToken = response.NextContinuationToken;
@@ -95,7 +104,7 @@ export const listAllRecursive = async (prefix: string): Promise<string[]> => {
     console.error("Error in listAllRecursive:", error);
     throw error;
   }
-  return allKeys;
+  return allObjects;
 };
 
 export const listObjects = async (prefix: string = ''): Promise<R2Object[]> => {
@@ -194,7 +203,8 @@ export const renameObject = async (oldKey: string, newKey: string): Promise<void
 
   if (oldKey.endsWith('/')) {
     const allItems = await listAllRecursive(oldKey);
-    for (const itemKey of allItems) {
+    for (const item of allItems) {
+      const itemKey = item.key;
       const relativePath = itemKey.substring(oldKey.length);
       const targetKey = `${newKey}${relativePath}`;
 
@@ -231,8 +241,8 @@ export const deleteObjects = async (keys: string[]): Promise<void> => {
   const keysToDelete = new Set<string>();
   for (const key of keys) {
     if (key.endsWith('/')) {
-      const nestedKeys = await listAllRecursive(key);
-      nestedKeys.forEach(nk => keysToDelete.add(nk));
+      const nestedItems = await listAllRecursive(key);
+      nestedItems.forEach(item => keysToDelete.add(item.key));
       keysToDelete.add(key);
     } else {
       keysToDelete.add(key);
@@ -322,22 +332,22 @@ export const downloadObject = async (
 };
 
 export const downloadFolder = async (prefix: string, onProgress?: (current: number, total: number) => void): Promise<void> => {
-  const allKeys = await listAllRecursive(prefix);
+  const allObjects = await listAllRecursive(prefix);
   // We only care about files
-  const fileKeys = allKeys.filter(key => !key.endsWith('/'));
-  const total = fileKeys.length;
+  const files = allObjects.filter(obj => obj.type === 'file');
+  const total = files.length;
 
   if (total === 0) {
     throw new Error("Folder is empty");
   }
 
   for (let i = 0; i < total; i++) {
-    const key = fileKeys[i];
+    const file = files[i];
     if (onProgress) onProgress(i + 1, total);
 
     try {
       // Trigger individual download for each file
-      await downloadObject(key);
+      await downloadObject(file.key);
 
       // Small delay to prevent browser from getting overwhelmed or blocking popups
       if (i < total - 1) {
