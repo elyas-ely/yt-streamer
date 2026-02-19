@@ -359,7 +359,7 @@ export const downloadFolder = async (prefix: string, onProgress?: (current: numb
         await new Promise(resolve => setTimeout(resolve, 500));
       }
     } catch (err) {
-      console.error(`Failed to download ${key}:`, err);
+      console.error(`Failed to download ${file.key}:`, err);
     }
   }
 };
