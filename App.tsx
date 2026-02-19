@@ -105,7 +105,7 @@ const App: React.FC = () => {
     if (window.innerWidth < 768) setIsSidebarOpen(false);
   };
 
-  const executeUploadTask = useCallback(async (task: UploadTask) => {
+  const executeUploadTask = useCallback(async (task: UploadTask, shouldRefresh = true) => {
     setUploadTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'uploading', startTime: Date.now() } : t));
 
     try {
@@ -137,8 +137,10 @@ const App: React.FC = () => {
       });
 
       setUploadTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'completed', progress: 100, loaded: t.total } : t));
-      fetchObjects();
-      refreshStorageStats();
+      if (shouldRefresh) {
+        fetchObjects();
+        refreshStorageStats();
+      }
     } catch (err: any) {
       console.error(`Upload failed for ${task.file.name}`, err);
       setUploadTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'failed', error: err.message } : t));
@@ -160,9 +162,10 @@ const App: React.FC = () => {
 
     setUploadTasks(prev => [...prev, ...newTasks]);
 
-    for (const task of newTasks) {
-      executeUploadTask(task);
-    }
+    // Launch uploads in parallel without waiting, but wait for the group to refresh once
+    await Promise.allSettled(newTasks.map(task => executeUploadTask(task, false)));
+    fetchObjects();
+    refreshStorageStats();
   };
 
   const handleRetryUpload = (id: string) => {
