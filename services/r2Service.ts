@@ -9,7 +9,6 @@ import {
   ListMultipartUploadsCommand,
   AbortMultipartUploadCommand
 } from "@aws-sdk/client-s3";
-import { Upload } from "@aws-sdk/lib-storage";
 import { XhrHttpHandler } from "@aws-sdk/xhr-http-handler";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { R2Object, Bucket } from '../types';
@@ -273,48 +272,56 @@ export const uploadFileWithProgress = async (
   onProgress: (loaded: number) => void
 ): Promise<void> => {
   const key = `${path}${file.name}`;
-  let parallelUploads3: Upload | null = null;
 
   try {
-    console.log(`[R2 Upload] Starting upload for ${file.name} to ${key}`);
+    console.log(`[R2 Upload] Starting single PUT upload for ${file.name} to ${key}`);
 
-    // Clean up any stale uploads for this key before starting
-    await abortMultipartUploadsForKey(key);
-
-    parallelUploads3 = new Upload({
-      client: s3Client,
-      params: {
-        Bucket: BUCKET_NAME,
-        Key: key,
-        Body: file,
-        ContentType: file.type || 'application/octet-stream',
-      },
-      // Cloudflare R2 supports single PUT up to 5GB. 
-      // Using 20MB part size for better reliability and progress granularity
-      partSize: 1024 * 1024 * 20,
-      queueSize: 3,
-      leavePartsOnError: false,
+    // Generate a presigned URL for the PUT operation
+    const command = new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      ContentType: file.type || 'application/octet-stream',
     });
 
-    parallelUploads3.on("httpUploadProgress", (progress) => {
-      if (progress.loaded !== undefined) {
-        onProgress(progress.loaded);
-      }
-    });
+    const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
 
-    const result = await parallelUploads3.done();
-    console.log(`[R2 Upload] Finished upload for ${file.name}:`, result);
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', url);
+
+      // Crucial: Set the Content-Type to match what was signed
+      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          onProgress(event.loaded);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          console.log(`[R2 Upload] Finished upload for ${file.name}`);
+          resolve();
+        } else {
+          console.error(`[R2 Upload] Upload failed with status ${xhr.status}:`, xhr.responseText);
+          reject(new Error(`Upload failed with status ${xhr.status}`));
+        }
+      };
+
+      xhr.onerror = () => {
+        console.error(`[R2 Upload] XHR Network Error for ${file.name}`, xhr);
+        reject(new Error('Network error during upload'));
+      };
+
+      xhr.onabort = () => {
+        console.warn(`[R2 Upload] Upload aborted for ${file.name}`);
+        reject(new Error('Upload aborted'));
+      };
+
+      xhr.send(file);
+    });
   } catch (error: any) {
-    console.error(`Upload error for ${file.name}:`, error);
-    // Be very explicit here - if it fails, try to abort to avoid "Ongoing Multipart Upload" state
-    try {
-      if (parallelUploads3 && typeof (parallelUploads3 as any).abort === 'function') {
-        await (parallelUploads3 as any).abort();
-        console.log(`[R2 Upload] Succesfully aborted failed upload for ${file.name}`);
-      }
-    } catch (abortErr) {
-      console.warn(`[R2 Upload] Secondary abort effort failed:`, abortErr);
-    }
+    console.error(`Presign/Upload initialization error for ${file.name}:`, error);
     throw error;
   }
 };
